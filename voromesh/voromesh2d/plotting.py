@@ -1,9 +1,11 @@
 import os
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from shapely.geometry import Polygon, MultiPolygon, LineString, Point
+from collections import defaultdict
 
 # Plotting the original Voronoi cells without any boudary filtering
-def plot_voronoi_cells(figure_name, voronoi_cells, points=None, marker_size=10, fill_color=False, show_labels=False, show_title=False, title='Original Voronoi Cells'):
+def plot_voronoi_cells(figure_name, voronoi_cells, points=None, marker_size=10, fill_color=False, show_figure=True, show_labels=False, show_title=False, title='Original Voronoi Cells'):
     """
     Plot the original Voronoi cells within a polygon and overlay seed points.
     
@@ -64,12 +66,136 @@ def plot_voronoi_cells(figure_name, voronoi_cells, points=None, marker_size=10, 
     
     # Save the figure in the 'Plots' folder
     plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
-    plt.show()
-    
+
+    if show_figure:
+        plt.show()
     
 
+# Plotting the Voronoi cells with reconstructed boundaries and internal edges
+def plot_voronoi_edges(clipped_cells, figure_name, show_figure=True):
+    """
+    Plot the whole region, boundary edges, and internal cell edges in separate plots.
+    
+    Parameters:
+    - clipped_cells: List of Shapely Polygon objects representing the clipped Voronoi cells.
+    - figure_name: The name of the file to save the figure.
+    """
+    # Function to extract the boundaries and the inter edges from the Voronoi cells
+    def extract_voronoi_edges(clipped_cells):
+        """
+        Extract and categorize Voronoi edges into boundary edges and internal cell edges.
+        
+        Boundary edges include all kinds of boundary edges (external and internal).
+        Internal cell edges are edges shared by two or more Voronoi cells.
+        
+        Parameters:
+        - clipped_cells: List of Shapely Polygon objects representing the clipped Voronoi cells.
+        
+        Returns:
+        - boundary_edges: List of LineString objects representing all boundary edges (external and internal).
+        - internal_cell_edges: List of LineString objects representing the internal Voronoi cell edges.
+        
+        Example usage:
+        - boundary_edges, internal_cell_edges = extract_voronoi_edges(clipped_cells)
+        """
+        # Dictionary to store edges with their counts
+        edge_count = defaultdict(int)
+
+        for cell in clipped_cells:
+            if isinstance(cell, Polygon):
+                exterior_coords = list(cell.exterior.coords)
+                for i in range(len(exterior_coords) - 1):
+                    line = tuple(sorted((exterior_coords[i], exterior_coords[i + 1])))
+                    edge_count[line] += 1
+
+                for interior in cell.interiors:
+                    interior_coords = list(interior.coords)
+                    for i in range(len(interior_coords) - 1):
+                        line = tuple(sorted((interior_coords[i], interior_coords[i + 1])))
+                        edge_count[line] += 1
+
+            elif isinstance(cell, MultiPolygon):
+                for poly in cell.geoms:
+                    exterior_coords = list(poly.exterior.coords)
+                    for i in range(len(exterior_coords) - 1):
+                        line = tuple(sorted((exterior_coords[i], exterior_coords[i + 1])))
+                        edge_count[line] += 1
+
+                    for interior in poly.interiors:
+                        interior_coords = list(interior.coords)
+                        for i in range(len(interior_coords) - 1):
+                            line = tuple(sorted((interior_coords[i], interior_coords[i + 1])))
+                            edge_count[line] += 1
+
+        boundary_edges = []
+        internal_cell_edges = []
+
+        for edge, count in edge_count.items():
+            line = LineString(edge)
+            if count == 1:
+                # Boundary edges are those that are shared by only one polygon
+                boundary_edges.append(line)
+            else:
+                # Internal cell edges are those that are shared by two or more polygons
+                internal_cell_edges.append(line)
+
+        return boundary_edges, internal_cell_edges
+    
+    # Extract boundary and internal cell edges
+    boundary_edges, internal_cell_edges = extract_voronoi_edges(clipped_cells)
+
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6), dpi=300)
+
+    def plot_cells(ax, cells, color='black', line_width=0.5):
+        for cell in cells:
+            if isinstance(cell, Polygon):
+                exterior = patches.Polygon(list(cell.exterior.coords), closed=True, edgecolor=color, fill=None, linewidth=line_width)
+                ax.add_patch(exterior)
+                for interior in cell.interiors:
+                    hole = patches.Polygon(list(interior.coords), closed=True, edgecolor=color, fill=None, linewidth=line_width)
+                    ax.add_patch(hole)
+            elif isinstance(cell, MultiPolygon):
+                for poly in cell.geoms:
+                    exterior = patches.Polygon(list(poly.exterior.coords), closed=True, edgecolor=color, fill=None, linewidth=line_width)
+                    ax.add_patch(exterior)
+                    for interior in poly.interiors:
+                        hole = patches.Polygon(list(interior.coords), closed=True, edgecolor=color, fill=None, linewidth=line_width)
+                        ax.add_patch(hole)
+
+    # Plot the whole region
+    plot_cells(axs[0], clipped_cells)
+    axs[0].set_title('Whole Region with Voronoi Meshing', fontsize=14)
+    axs[0].set_aspect('equal')
+    axs[0].axis('off')
+
+    # Calculate plot limits for the whole region
+    all_coords = [coord for cell in clipped_cells for coord in cell.exterior.coords]
+    min_x, min_y = min([coord[0] for coord in all_coords]), min([coord[1] for coord in all_coords])
+    max_x, max_y = max([coord[0] for coord in all_coords]), max([coord[1] for coord in all_coords])
+    axs[0].set_xlim(min_x, max_x)
+    axs[0].set_ylim(min_y, max_y)
+
+    # Plot boundary edges
+    for edge in boundary_edges:
+        axs[1].plot(*edge.xy, color='red', linewidth=0.5)
+    axs[1].set_title('Reconstructed Boundaries', fontsize=14)
+    axs[1].set_aspect('equal')
+    axs[1].axis('off')
+
+    # Plot internal cell edges
+    for edge in internal_cell_edges:
+        axs[2].plot(*edge.xy, color='blue', linewidth=0.5)
+    axs[2].set_title('Internal Cell Edges', fontsize=14)
+    axs[2].set_aspect('equal')
+    axs[2].axis('off')
+
+    plt.tight_layout(pad=2.0)
+    plt.savefig(figure_name, format='png', dpi=600)
+    if show_figure:
+        plt.show()
+
 # Plotting the original Voronoi cells with boudary filtering    
-def plot_voronoi_cells_withBoundaryFiltering(figure_name, polygon, voronoi_cells, points=None, marker_size=10, fill_color=False, show_labels=False, show_title=False, title='Original Voronoi Cells with Boundary Filtering'):
+def plot_voronoi_cells_withBoundaryFiltering(figure_name, polygon, voronoi_cells, points=None, marker_size=10, fill_color=False, show_figure=True, show_labels=False, show_title=False, title='Original Voronoi Cells with Boundary Filtering'):
     """
     Plot Voronoi cells within a given polygon and overlay seed points and cell vertices,
     excluding the original polygon boundaries from the Voronoi cell boundaries.
@@ -168,11 +294,12 @@ def plot_voronoi_cells_withBoundaryFiltering(figure_name, polygon, voronoi_cells
     
     # Save the figure in the 'Plots' folder
     plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
-    plt.show()
+    if show_figure:
+        plt.show()
    
 
 # Plotting the polygon boundaries from the given polygon region and also the seed points    
-def plot_boundary_with_points(figure_name, polygon, points=None, marker_size=1, show_labels=False, show_title=False, title='Boundaries with Initial Seed Points'):
+def plot_boundary_with_points(figure_name, polygon, points=None, marker_size=1, show_figure=True, show_labels=False, show_title=False, title='Boundaries with Initial Seed Points'):
     """
     Plots the boundary of a Shapely polygon or multipolygon, and overlays seed points.
     
@@ -235,12 +362,13 @@ def plot_boundary_with_points(figure_name, polygon, points=None, marker_size=1, 
     
     # Save the figure in the 'Plots' folder
     plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
-    plt.show()
+    if show_figure:
+        plt.show()
     
     
 
 # Plotting the original Voronoi cells highlighting the targeted shortest edges with either N th or a threshold length
-def plot_voronoi_cells_with_short_edges(figure_name, voronoi_cells, N=None, threshold=None, points=None, marker_size=10, show_labels=False, show_title=False, title='Original Voronoi Cells Highlighting Short Edges'):
+def plot_voronoi_cells_with_short_edges(figure_name, voronoi_cells, N=None, threshold=None, points=None, marker_size=10, show_figure=True, show_labels=False, show_title=False, title='Original Voronoi Cells Highlighting Short Edges'):
     """
     Plot the original Voronoi cells within a polygon and overlay seed points.
     Highlight the shortest edges that are less than or equal to the given 'N' th shortest edge or below a length threshold.
@@ -346,10 +474,11 @@ def plot_voronoi_cells_with_short_edges(figure_name, voronoi_cells, N=None, thre
     
     # Save the figure in the 'Plots' folder
     plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
-    plt.show()
+    if show_figure:
+        plt.show()
     
 # Fuction to plot the Polygon boundaries highlighting the short edges
-def plot_boundary_with_short_edges(figure_name, polygon, N=None, threshold=None, points=None, marker_size=1, show_labels=False, show_title=False, title='Boundaries Highlighting Short Edges'):
+def plot_boundary_with_short_edges(figure_name, polygon, N=None, threshold=None, points=None, marker_size=1, show_figure=True, show_labels=False, show_title=False, title='Boundaries Highlighting Short Edges'):
     """
     Plots the boundary of a Shapely polygon or multipolygon, and overlays seed points.
     Highlights the shortest edges of the boundaries that are less than or equal to the given 'N' th shortest edge
@@ -464,59 +593,5 @@ def plot_boundary_with_short_edges(figure_name, polygon, N=None, threshold=None,
     
     # Save the figure in the 'Plots' folder
     plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
-    plt.show()
-
-
-# ==========================================================================================================
-# ==========================================================================================================
-# Plotting the polygon boundaries from the given polygon region and also the original Voronoi cells (Extra function, may need later)    
-def plot_polygonBoundary_with_originalVoronoi_cells(figure_name, polygon, voronoi_cells, points=None, marker_size=10):
-    """
-    Plot Voronoi cells within a given polygon and overlay seed points.
-    
-    Parameters:
-    - polygon: Shapely Polygon or MultiPolygon defining the boundary.
-    - voronoi_cells: List of Shapely Polygon objects representing the Voronoi cells.
-    - points: Optional 2D numpy array of points (x, y) to overlay on the plot.
-    - marker_size: Size of the markers for the points.
-    """
-    fig, ax = plt.subplots()
-    # Plot the boundary of the polygon
-    def plot_polygon(polygon, color_ex, color_in, linestyle, linewidth, label=None):
-        x, y = polygon.exterior.xy
-        ax.plot(x, y, color=color_ex, linestyle=linestyle, linewidth=linewidth, label=label)
-        for interior in polygon.interiors:
-            x, y = interior.xy
-            ax.plot(x, y, color=color_in, linestyle=linestyle, linewidth=linewidth)
-    
-    # Add the polygon boundary once
-    label_added = False
-    if isinstance(polygon, Polygon):
-        plot_polygon(polygon, color_ex='black', color_in='red', linestyle='-', linewidth=2, label='Polygon Boundary')
-        label_added = True
-    elif isinstance(polygon, MultiPolygon):
-        for poly in polygon.geoms:
-            if not label_added:
-                plot_polygon(poly, color_ex='black', color_in='red', linestyle='-', linewidth=2, label='Polygon Boundary')
-                label_added = True
-            else:
-                plot_polygon(poly, color_ex='black', color_in='red', linestyle='-', linewidth=2)
-    
-    # Plot the Voronoi cells
-    for cell in voronoi_cells:
-        if isinstance(cell, Polygon):
-            x, y = cell.exterior.xy
-            ax.plot(x, y, 'blue')  # Plot the Voronoi cell boundary
-        elif isinstance(cell, MultiPolygon):
-            for poly in cell.geoms:
-                x, y = poly.exterior.xy
-                ax.plot(x, y, 'blue')  # Plot the boundary of each polygon
-
-    # Overlay the points, if provided
-    if points is not None:
-        ax.scatter(points[:, 0], points[:, 1], color='red', marker='.', s=marker_size, label='Seed Points')
-    
-    ax.set_aspect('equal')
-    plt.legend()
-    plt.savefig(figure_name, format='png', dpi=600)
-    plt.show()
+    if show_figure:
+        plt.show()

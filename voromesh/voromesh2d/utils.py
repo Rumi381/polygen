@@ -2,14 +2,16 @@ import os
 import re
 import time
 import trimesh
-from shapely.geometry import Polygon, Point
+import numpy as np
+from shapely.geometry import Polygon, MultiPolygon, Point, LineString
 from shapely.ops import unary_union
+from collections import defaultdict
 
 from .geometry import Geometry
 from .voroGen import generate_poisson_points, lloyds_algorithm_polygon, generate_voronoi_cells
-from .optimize import collapse_short_boundaryEdges, collapse_short_voronoiEdges, get_voronoi_stats, print_short_boundaryEdges, print_short_voronoiEdges
-from .plotting import plot_boundary_with_points, plot_boundary_with_short_edges, plot_voronoi_cells, plot_voronoi_cells_with_short_edges, plot_voronoi_cells_withBoundaryFiltering
-from .savingData import save_polygon_boundaries_to_py, save_voronoi_cells_withBoundaryFiltering_to_py, save_voronoi_cells_withoutFiltering_to_py
+from .optimize import collapse_short_voronoiEdges, print_short_voronoiEdges
+from .plotting import plot_boundary_with_points, plot_voronoi_cells, plot_voronoi_edges, plot_voronoi_cells_with_short_edges
+from .savingData import save_voronoi_cells_with_edges_to_py
 
 
 # Function to read the input file
@@ -20,7 +22,6 @@ def parse_input_file(input_file_path):
         "points_seed": 42,
         "N_iter": 100000,
         "edgeLength_threshold": None,
-        "boundary_optimize": True,
         "visualize": False,
         "figureLabels": False,
         "figureTitle": False,
@@ -140,6 +141,8 @@ def generate_variable_names(input_obj):
         "figure_voronoi_with_short_edges": f"{base_name}_Voronoi_with_short_edges.png",
         "figure_original_voronoi_cells": f"{base_name}_original_Voronoi_cells.png",
         "figure_boundary_filtered_voronoi_cells": f"{base_name}_boundaryFiltered_Voronoi_cells.png",
+        "figure_original_extracted_voronoi_cells": f"{base_name}_original_extracted_Voronoi_cells.png",
+        "figure_collapsed_extracted_voronoi_cells": f"{base_name}_collapsed_extracted_Voronoi_cells.png",
         "figure_collapsed_voronoi_cells": f"{base_name}_collapsed_Voronoi_cells.png",
         "figure_collapsed_Boundaries": f"{base_name}_collapsed_Boundaries.png",
         "figure_nonOptimizedBoundary_filtered_collapsedVoronoi_Cells": f"{base_name}_nonOptimizedBoundary_filtered_collapsedVoronoi_Cells.png",
@@ -154,8 +157,69 @@ def generate_variable_names(input_obj):
 
     return variable_names
 
+# Function to extract the boundaries and the inter edges from the Voronoi cells
+def extract_voronoi_edges(clipped_cells):
+    """
+    Extract and categorize Voronoi edges into boundary edges and internal cell edges.
+    
+    Boundary edges include all kinds of boundary edges (external and internal).
+    Internal cell edges are edges shared by two or more Voronoi cells.
+    
+    Parameters:
+    - clipped_cells: List of Shapely Polygon objects representing the clipped Voronoi cells.
+    
+    Returns:
+    - boundary_edges: List of LineString objects representing all boundary edges (external and internal).
+    - internal_cell_edges: List of LineString objects representing the internal Voronoi cell edges.
+    
+    Example usage:
+    - boundary_edges, internal_cell_edges = extract_voronoi_edges(clipped_cells)
+    """
+    # Dictionary to store edges with their counts
+    edge_count = defaultdict(int)
 
-def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLength_threshold=None, boundary_optimize=True, visualize=False, figureLabels=False, figureTitle=False, saveData=True):
+    for cell in clipped_cells:
+        if isinstance(cell, Polygon):
+            exterior_coords = list(cell.exterior.coords)
+            for i in range(len(exterior_coords) - 1):
+                line = tuple(sorted((exterior_coords[i], exterior_coords[i + 1])))
+                edge_count[line] += 1
+
+            for interior in cell.interiors:
+                interior_coords = list(interior.coords)
+                for i in range(len(interior_coords) - 1):
+                    line = tuple(sorted((interior_coords[i], interior_coords[i + 1])))
+                    edge_count[line] += 1
+
+        elif isinstance(cell, MultiPolygon):
+            for poly in cell.geoms:
+                exterior_coords = list(poly.exterior.coords)
+                for i in range(len(exterior_coords) - 1):
+                    line = tuple(sorted((exterior_coords[i], exterior_coords[i + 1])))
+                    edge_count[line] += 1
+
+                for interior in poly.interiors:
+                    interior_coords = list(interior.coords)
+                    for i in range(len(interior_coords) - 1):
+                        line = tuple(sorted((interior_coords[i], interior_coords[i + 1])))
+                        edge_count[line] += 1
+
+    boundary_edges = []
+    internal_cell_edges = []
+
+    for edge, count in edge_count.items():
+        line = LineString(edge)
+        if count == 1:
+            # Boundary edges are those that are shared by only one polygon
+            boundary_edges.append(line)
+        else:
+            # Internal cell edges are those that are shared by two or more polygons
+            internal_cell_edges.append(line)
+
+    return boundary_edges, internal_cell_edges
+
+# Function to create the 2D Voronoi mesh from the given parameters
+def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLength_threshold=None, visualize=False, figureLabels=False, figureTitle=False, saveData=True):
     """
     Compute and visualize Voronoi diagrams within an arbitrarily shaped 2D region, 
     with options for edge collapsing and boundary optimization. This function 
@@ -168,8 +232,7 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
     - points_seed: Random seed for generating initial Poisson disk sampling points.
     - N_iter: Number of iterations for Lloyd's algorithm to relax the points.
     - edgeLength_threshold: Length threshold for collapsing short edges in the Voronoi diagram.
-    - boundary_optimize: Boolean indicating whether to optimize the boundary by collapsing short edges.
-    - visualize: Boolean indicating whether to generate and save visualizations of the process.
+    - visualize: Boolean indicating whether to visualize the figure while running the algorithm.
     - figureLabels: Boolean indicating whether to show labels in the generated plots.
     - figureTitle: Boolean indicating whether to add titles to the generated plots.
     - saveData: Boolean indicating whether to save the resulting data structures to .py files.
@@ -179,15 +242,11 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
        - Generate and visualize a Voronoi diagram within a given boundary with a specified number of seed points.
        - Example: `computeVoroni('boundary.obj', 100, visualize=True)`
     
-    2. **Voronoi Diagram with Edge Collapsing**:
+    2. **Optimized Voronoi Diagram with Edge Collapsing**:
        - Generate a Voronoi diagram and collapse edges shorter than a specified length threshold.
        - Example: `computeVoroni('boundary.obj', 100, edgeLength_threshold=0.1, visualize=True)`
     
-    3. **Optimized Boundary Handling**:
-       - Generate a Voronoi diagram, collapse short edges, and optimize the boundary by collapsing short boundary edges.
-       - Example: `computeVoroni('boundary.obj', 100, edgeLength_threshold=0.1, boundary_optimize=True, visualize=True)`
-    
-    4. **Data Saving**:
+    3. **Data Saving**:
        - Save the resulting Voronoi cell and boundary data to .py files for further use in Abaqus.
        - Example: `computeVoroni('boundary.obj', 100, saveData=True)`
 
@@ -196,7 +255,7 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
     2. Generate initial Poisson disk sampling points within the boundary.
     3. Relax the points using Lloyd's algorithm for a specified number of iterations.
     4. Generate Voronoi cells based on the relaxed points.
-    5. Optionally collapse short edges in the Voronoi cells and optimize the boundary.
+    5. Optionally collapse short edges in the Voronoi cells and optimize the Voronoi mesh.
     6. Visualize the results and save the plots, if requested.
     7. Save the Voronoi cell and boundary data to .py files, if requested.
 
@@ -207,7 +266,6 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
             points_seed=42,
             N_iter=100000,
             edgeLength_threshold=0.1,
-            boundary_optimize=True,
             visualize=True,
             figureLabels=True,
             figureTitle=True,
@@ -235,9 +293,9 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
     print_short_voronoiEdges(variables[names["voronoi_cells"]], N=10)
     get_voronoi_stats(variables[names["voronoi_cells"]], N=10, file_name='Report_OriginalVoronoi.txt')
     print('')
-    print('==========================================================')
-    print('')
-    print_short_boundaryEdges(variables[names["polygon_region"]], N=10)
+    # print('==========================================================')
+    # print('')
+    # print_short_boundaryEdges(variables[names["polygon_region"]], N=10)
     print('==========================================================')
     print('==========================================================')
     print('')
@@ -246,8 +304,8 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
         variables[names["collapsed_voronoi_cells"]] = collapse_short_voronoiEdges(variables[names["voronoi_cells"]], threshold=edgeLength_threshold)
         get_voronoi_stats(variables[names["collapsed_voronoi_cells"]], N=10, file_name='Report_OptimizedVoronoi.txt')
         
-        if boundary_optimize:
-            variables[names["collapsed_polygonRegion"]] = collapse_short_boundaryEdges(variables[names["polygon_region"]], threshold=edgeLength_threshold)
+        # if boundary_optimize:
+        #     variables[names["collapsed_polygonRegion"]] = collapse_short_boundaryEdges(variables[names["polygon_region"]], threshold=edgeLength_threshold)
 
     voronoiCompute_time = time.time()  # End timing
     elapsed_time = voronoiCompute_time - start_time
@@ -260,35 +318,36 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
     print('==========================================================')
     print('')
 
-    if visualize:
-        # Plotting functions
-        plot_boundary_with_points(names["figure_boundary_with_initial_seed_points"], variables[names["polygon_region"]], points=variables[names["seed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle)
-        plot_boundary_with_points(names["figure_boundary_with_lloyds_seed_points"], variables[names["polygon_region"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle, title='Boundaries with CVT Seed Points')
-        plot_voronoi_cells(names["figure_original_voronoi_cells"], variables[names["voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle)
-        plot_voronoi_cells_withBoundaryFiltering(names["figure_boundary_filtered_voronoi_cells"], variables[names["polygon_region"]], variables[names["voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle)
-        # plot_voronoi_cells_withBoundaryFiltering(names["figure_boundary_filtered_voronoi_cells"], variables[names["polygon_region"]], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1)
+    # Plotting functions
+    plot_boundary_with_points(names["figure_boundary_with_initial_seed_points"], variables[names["polygon_region"]], points=variables[names["seed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle)
+    plot_boundary_with_points(names["figure_boundary_with_lloyds_seed_points"], variables[names["polygon_region"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle, title='Boundaries with CVT Seed Points')
+    plot_voronoi_cells(names["figure_original_voronoi_cells"], variables[names["voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle)
+    plot_voronoi_edges(variables[names["voronoi_cells"]], names["figure_original_extracted_voronoi_cells"], show_figure=visualize)
+    # plot_voronoi_cells_withBoundaryFiltering(names["figure_boundary_filtered_voronoi_cells"], variables[names["polygon_region"]], variables[names["voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle)
+    # plot_voronoi_cells_withBoundaryFiltering(names["figure_boundary_filtered_voronoi_cells"], variables[names["polygon_region"]], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1)
+    
+    if edgeLength_threshold is not None:
+        plot_voronoi_cells_with_short_edges(names["figure_boundary_with_short_edges"], variables[names["voronoi_cells"]], threshold=edgeLength_threshold, marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle)
+        plot_voronoi_cells(names["figure_collapsed_voronoi_cells"], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle, title='Voronoi after Collapsing Short Edges')
+        plot_voronoi_edges(variables[names["voronoi_cells"]], names["figure_collapsed_extracted_voronoi_cells"], show_figure=visualize)
+        # plot_voronoi_cells_withBoundaryFiltering(names["figure_nonOptimizedBoundary_filtered_collapsedVoronoi_Cells"], variables[names["polygon_region"]], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle, title='Collapsed Voronoi with Non-Optimized Boundary Filtering')
         
-        if edgeLength_threshold is not None:
-            plot_voronoi_cells_with_short_edges(names["figure_boundary_with_short_edges"], variables[names["voronoi_cells"]], threshold=edgeLength_threshold, marker_size=0.1, show_labels=figureLabels, show_title=figureTitle)
-            plot_voronoi_cells(names["figure_collapsed_voronoi_cells"], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle, title='Voronoi after Collapsing Short Edges')
-            plot_voronoi_cells_withBoundaryFiltering(names["figure_nonOptimizedBoundary_filtered_collapsedVoronoi_Cells"], variables[names["polygon_region"]], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle, title='Collapsed Voronoi with Non-Optimized Boundary Filtering')
-            
-            if boundary_optimize:
-                plot_boundary_with_short_edges(names["figure_boundary_with_short_edges"], variables[names["polygon_region"]], threshold=edgeLength_threshold, marker_size=0.1, show_labels=figureLabels, show_title=figureTitle)
-                plot_boundary_with_points(names["figure_collapsed_Boundaries"], variables[names["collapsed_polygonRegion"]], show_labels=figureLabels, show_title=figureTitle, title='Boundaries after Collapsing Short Edges')
-                plot_voronoi_cells_withBoundaryFiltering(names["figure_OptimizedBoundary_filtered_collapsedVoronoi_Cells"], variables[names["collapsed_polygonRegion"]], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_labels=figureLabels, show_title=figureTitle, title='Collapsed Voronoi with Optimized Boundary Filtering')
+        # if boundary_optimize:
+        #     plot_boundary_with_short_edges(names["figure_boundary_with_short_edges"], variables[names["polygon_region"]], threshold=edgeLength_threshold, marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle)
+        #     plot_boundary_with_points(names["figure_collapsed_Boundaries"], variables[names["collapsed_polygonRegion"]], show_figure=visualize, show_labels=figureLabels, show_title=figureTitle, title='Boundaries after Collapsing Short Edges')
+        #     plot_voronoi_cells_withBoundaryFiltering(names["figure_OptimizedBoundary_filtered_collapsedVoronoi_Cells"], variables[names["collapsed_polygonRegion"]], variables[names["collapsed_voronoi_cells"]], points=variables[names["relaxed_points"]], marker_size=0.1, show_figure=visualize, show_labels=figureLabels, show_title=figureTitle, title='Collapsed Voronoi with Optimized Boundary Filtering')
 
     if saveData:
         if edgeLength_threshold is not None:
             variables[names["voronoi_cells"]] = variables[names["collapsed_voronoi_cells"]]
             
-            if boundary_optimize:
-                variables[names["polygon_region"]] = variables[names["collapsed_polygonRegion"]]
+            # if boundary_optimize:
+            #     variables[names["polygon_region"]] = variables[names["collapsed_polygonRegion"]]
         
         # Saving functions
-        save_polygon_boundaries_to_py(variables[names["polygon_region"]], filename=names["polygon_data_file"], data_name=names["polygon_data"])
-        save_voronoi_cells_withoutFiltering_to_py(variables[names["voronoi_cells"]], filename=names["voronoi_original_data_file"], data_name=names["voronoi_original_data"])
-        save_voronoi_cells_withBoundaryFiltering_to_py(variables[names["polygon_region"]], variables[names["voronoi_cells"]], filename=names["voronoi_with_boundary_filtering_data_file"], data_name=names["voronoi_with_boundary_filtering_data"])
+        # save_polygon_boundaries_to_py(variables[names["polygon_region"]], filename=names["polygon_data_file"], data_name=names["polygon_data"])
+        save_voronoi_cells_with_edges_to_py(variables[names["voronoi_cells"]], filename=names["voronoi_original_data_file"], data_name=names["voronoi_original_data"])
+        # save_voronoi_cells_withBoundaryFiltering_to_py(variables[names["polygon_region"]], variables[names["voronoi_cells"]], filename=names["voronoi_with_boundary_filtering_data_file"], data_name=names["voronoi_with_boundary_filtering_data"])
 
     end_time = time.time()  # End timing
     elapsed_time = end_time - start_time
@@ -319,7 +378,6 @@ def computeVoronoi2d_fromInputFile(input_file_path):
     points_seed = 42
     N_iter = 100000
     edgeLength_threshold = 0.1
-    boundary_optimize = True
     visualize = False
     figureLabels = False
     figureTitle = False
@@ -338,8 +396,7 @@ def computeVoronoi2d_fromInputFile(input_file_path):
     - points_seed: Random seed for generating initial Poisson disk sampling points.
     - N_iter: Number of iterations for Lloyd's algorithm to relax the points.
     - edgeLength_threshold: Length threshold for collapsing short edges in the Voronoi diagram.
-    - boundary_optimize: Boolean indicating whether to optimize the boundary by collapsing short edges.
-    - visualize: Boolean indicating whether to generate and save visualizations of the process.
+    - visualize: Boolean indicating whether to visualize the figure while running the algorithm.
     - figureLabels: Boolean indicating whether to show labels in the generated plots.
     - figureTitle: Boolean indicating whether to add titles to the generated plots.
     - saveData: Boolean indicating whether to save the resulting data structures to .py files.
@@ -352,7 +409,7 @@ def computeVoronoi2d_fromInputFile(input_file_path):
     points_seed = parameters["points_seed"]
     N_iter = parameters["N_iter"]
     edgeLength_threshold = parameters["edgeLength_threshold"]
-    boundary_optimize = parameters["boundary_optimize"]
+    # boundary_optimize = parameters["boundary_optimize"]
     visualize = parameters["visualize"]
     figureLabels = parameters["figureLabels"]
     figureTitle = parameters["figureTitle"]
@@ -369,7 +426,6 @@ def computeVoronoi2d_fromInputFile(input_file_path):
         points_seed=points_seed,
         N_iter=N_iter,
         edgeLength_threshold=edgeLength_threshold,
-        boundary_optimize=boundary_optimize,
         visualize=visualize,
         figureLabels=figureLabels,
         figureTitle=figureTitle,
@@ -441,3 +497,133 @@ def print_docstring(obj):
     ])
     
     print(formatted_docstring)
+
+# Function to analyze the statistics of the Voronoi Cells
+def analyze_voronoi_cells(voronoi_cells):
+    """
+    Analyze the Voronoi cells to calculate useful statistics such as average grain size,
+    percentage of different grain sizes, and the lengths of the shortest edges.
+
+    Parameters:
+    - voronoi_cells: List of Shapely Polygon or MultiPolygon objects representing the Voronoi cells.
+
+    Returns:
+    - A dictionary containing various statistics about the Voronoi cells.
+    """
+    edge_lengths = []
+    cell_areas = []
+
+    for cell in voronoi_cells:
+        if isinstance(cell, Polygon):
+            exterior_coords = list(cell.exterior.coords)
+            cell_areas.append(cell.area)
+            for i in range(len(exterior_coords) - 1):
+                line = LineString([exterior_coords[i], exterior_coords[i + 1]])
+                edge_lengths.append(line.length)
+        elif isinstance(cell, MultiPolygon):
+            for poly in cell.geoms:
+                exterior_coords = list(poly.exterior.coords)
+                cell_areas.append(poly.area)
+                for i in range(len(exterior_coords) - 1):
+                    line = LineString([exterior_coords[i], exterior_coords[i + 1]])
+                    edge_lengths.append(line.length)
+
+    edge_lengths = np.array(edge_lengths)
+    cell_areas = np.array(cell_areas)
+
+    stats = {
+        "average_edge_length": np.mean(edge_lengths),
+        "min_edge_length": np.min(edge_lengths),
+        "max_edge_length": np.max(edge_lengths),
+        "average_cell_area": np.mean(cell_areas),
+        "min_cell_area": np.min(cell_areas),
+        "max_cell_area": np.max(cell_areas),
+        "total_cells": len(cell_areas),
+        "total_edges": len(edge_lengths)
+    }
+
+    grain_size_bins = np.histogram(cell_areas, bins='auto')
+    stats["grain_size_distribution"] = grain_size_bins
+
+    return stats
+
+# Function to create the report of the statistics
+def get_voronoi_stats(voronoi_cells, N=None, threshold=None, file_name='Report_OriginalVoronoi.txt'):
+    """
+    Print useful statistics about the Voronoi cells, including the lengths of the shortest edges.
+    Save the print statements in the Report.txt file inside the 'Report' directory.
+
+    Parameters:
+    - voronoi_cells: List of Shapely Polygon or MultiPolygon objects representing the Voronoi cells.
+    - N: Optional, the number of shortest edges to print. If None, print all edges.
+    - threshold: Optional, the length threshold to print edges shorter than this value. If None, print edges based on N.
+
+    Prints the lengths of the edges in the format:
+    Index: <index>, Length: <length>
+    
+    Example usage:
+        - print_voronoi_statistics(voronoi_cells, N=10)
+        - print_voronoi_statistics(voronoi_cells, threshold=0.1)
+    """
+    if (N is None and threshold is None) or (N is not None and threshold is not None):
+        raise ValueError("Specify exactly one of 'N' or 'threshold'.")
+
+    stats = analyze_voronoi_cells(voronoi_cells)
+
+    # Ensure the 'Report' directory exists
+    if not os.path.exists('Reports'):
+        os.makedirs('Reports')
+
+    # Write to file inside 'Report' directory
+    file_path = os.path.join('Reports', file_name)
+    
+    with open(file_path, 'w') as file:
+        # Print general statistics
+        file.write("Voronoi Cell Statistics:\n")
+        file.write(f"Average Edge Length: {stats['average_edge_length']:.5f}\n")
+        file.write(f"Minimum Edge Length: {stats['min_edge_length']:.5f}\n")
+        file.write(f"Maximum Edge Length: {stats['max_edge_length']:.5f}\n")
+        file.write(f"Average Cell Area: {stats['average_cell_area']:.5f}\n")
+        file.write(f"Minimum Cell Area: {stats['min_cell_area']:.5f}\n")
+        file.write(f"Maximum Cell Area: {stats['max_cell_area']:.5f}\n")
+        file.write(f"Total Number of Cells: {stats['total_cells']}\n")
+        file.write(f"Total Number of Edges: {stats['total_edges']}\n")
+
+        # Print grain size distribution
+        file.write("\nGrain Size Distribution:\n")
+        for i in range(len(stats["grain_size_distribution"][0])):
+            file.write(f"Grain size range {stats['grain_size_distribution'][1][i]:.5f} to {stats['grain_size_distribution'][1][i + 1]:.5f}: {stats['grain_size_distribution'][0][i]} cells\n")
+
+        # Collect all edges with their lengths for the shortest edges analysis
+        edges = []
+        for cell in voronoi_cells:
+            if isinstance(cell, Polygon):
+                exterior_coords = list(cell.exterior.coords)
+                for i in range(len(exterior_coords) - 1):
+                    line = LineString([exterior_coords[i], exterior_coords[i + 1]])
+                    edges.append((line.length, line))
+            elif isinstance(cell, MultiPolygon):
+                for poly in cell.geoms:
+                    exterior_coords = list(poly.exterior.coords)
+                    for i in range(len(exterior_coords) - 1):
+                        line = LineString([exterior_coords[i], exterior_coords[i + 1]])
+                        edges.append((line.length, line))
+
+        # Sort edges by length
+        edges.sort(key=lambda x: x[0])
+
+        # Determine the edges to print based on N or threshold
+        if N is not None:
+            edges_to_print = edges[:N]
+        else:
+            edges_to_print = [edge for edge in edges if edge[0] < threshold]
+
+        if not edges_to_print:
+            # If there are no edges to print, print a message
+            file.write(f'\nThere are no edges shorter than the threshold of {threshold}.\n')
+            return
+
+        # Print the shortest edges
+        file.write('\n10 Shortest Edge Lengths:\n')
+        for idx, (length, _) in enumerate(edges_to_print):
+            file.write(f"Index: {idx}, Length: {length:.5f}\n")

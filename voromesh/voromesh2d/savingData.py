@@ -1,5 +1,123 @@
 import os
 from shapely.geometry import Polygon, MultiPolygon, Point, LineString
+from collections import defaultdict
+
+# Function to save the data for original Voronoi, boundaries and internal cell edges
+def save_voronoi_cells_with_edges_to_py(voronoi_cells, filename='voronoi_data.py', data_name='voronoi_lines'):
+    """
+    Save the structured information of the original Voronoi cells, boundary edges, and internal cell edges to a .py file for use in Abaqus, without any boundary filtering.
+    
+    Parameters:
+    - voronoi_cells: List of Shapely Polygon objects representing the Voronoi cells.
+    - filename: The name of the file to save the Voronoi cell information.
+    - voronoi_data_name: The name of the data variable for Voronoi cells to be saved in the .py file.
+    - boundary_data_name: The name of the data variable for boundary edges to be saved in the .py file.
+    - internal_data_name: The name of the data variable for internal cell edges to be saved in the .py file.
+    """
+    lines_to_save = []
+    boundary_lines = []
+    internal_lines = []
+
+    def process_polygon(polygon):
+        exterior_coords = list(polygon.exterior.coords)
+        for i in range(len(exterior_coords) - 1):
+            line = LineString([exterior_coords[i], exterior_coords[i + 1]])
+            lines_to_save.append(((line.coords[0][0], line.coords[0][1]), (line.coords[1][0], line.coords[1][1])))
+
+    for cell in voronoi_cells:
+        if isinstance(cell, Polygon):
+            process_polygon(cell)
+        elif isinstance(cell, MultiPolygon):
+            for poly in cell.geoms:
+                process_polygon(poly)
+
+    # Function to extract the boundaries and the inter edges from the Voronoi cells
+    def extract_voronoi_edges(clipped_cells):
+        """
+        Extract and categorize Voronoi edges into boundary edges and internal cell edges.
+        
+        Boundary edges include all kinds of boundary edges (external and internal).
+        Internal cell edges are edges shared by two or more Voronoi cells.
+        
+        Parameters:
+        - clipped_cells: List of Shapely Polygon objects representing the clipped Voronoi cells.
+        
+        Returns:
+        - boundary_edges: List of LineString objects representing all boundary edges (external and internal).
+        - internal_cell_edges: List of LineString objects representing the internal Voronoi cell edges.
+        
+        Example usage:
+        - boundary_edges, internal_cell_edges = extract_voronoi_edges(clipped_cells)
+        """
+        # Dictionary to store edges with their counts
+        edge_count = defaultdict(int)
+
+        for cell in clipped_cells:
+            if isinstance(cell, Polygon):
+                exterior_coords = list(cell.exterior.coords)
+                for i in range(len(exterior_coords) - 1):
+                    line = tuple(sorted((exterior_coords[i], exterior_coords[i + 1])))
+                    edge_count[line] += 1
+
+                for interior in cell.interiors:
+                    interior_coords = list(interior.coords)
+                    for i in range(len(interior_coords) - 1):
+                        line = tuple(sorted((interior_coords[i], interior_coords[i + 1])))
+                        edge_count[line] += 1
+
+            elif isinstance(cell, MultiPolygon):
+                for poly in cell.geoms:
+                    exterior_coords = list(poly.exterior.coords)
+                    for i in range(len(exterior_coords) - 1):
+                        line = tuple(sorted((exterior_coords[i], exterior_coords[i + 1])))
+                        edge_count[line] += 1
+
+                    for interior in poly.interiors:
+                        interior_coords = list(interior.coords)
+                        for i in range(len(interior_coords) - 1):
+                            line = tuple(sorted((interior_coords[i], interior_coords[i + 1])))
+                            edge_count[line] += 1
+
+        boundary_edges = []
+        internal_cell_edges = []
+
+        for edge, count in edge_count.items():
+            line = LineString(edge)
+            if count == 1:
+                # Boundary edges are those that are shared by only one polygon
+                boundary_edges.append(line)
+            else:
+                # Internal cell edges are those that are shared by two or more polygons
+                internal_cell_edges.append(line)
+
+        return boundary_edges, internal_cell_edges
+
+    # Extract boundary and internal cell edges
+    boundary_edges, internal_cell_edges = extract_voronoi_edges(voronoi_cells)
+    
+    # Process boundary edges
+    for line in boundary_edges:
+        boundary_lines.append(((line.coords[0][0], line.coords[0][1]), (line.coords[1][0], line.coords[1][1])))
+
+    # Process internal cell edges
+    for line in internal_cell_edges:
+        internal_lines.append(((line.coords[0][0], line.coords[0][1]), (line.coords[1][0], line.coords[1][1])))
+
+    # Write to file
+    boundary_data_name = f"{data_name}_boundaries"
+    internal_data_name = f"{data_name}_internalEdges"
+    
+    # Ensure the 'voronoiDataFiles' directory exists
+    if not os.path.exists('voronoiDataFiles'):
+        os.makedirs('voronoiDataFiles')
+
+    # Write to file inside 'voronoiDataFiles' directory
+    file_path = os.path.join('voronoiDataFiles', filename)
+    with open(file_path, 'w') as file:
+        file.write(f"{data_name} = {repr(lines_to_save)}\n")
+        file.write(f"{boundary_data_name} = {repr(boundary_lines)}\n")
+        file.write(f"{internal_data_name} = {repr(internal_lines)}\n")
+
 
 # Function to save original Voronoi cells data structure without the boundary filtering
 def save_voronoi_cells_withoutFiltering_to_py(voronoi_cells, filename='voronoi_data.py', data_name='voronoi_lines'):
