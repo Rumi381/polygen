@@ -7,41 +7,41 @@ import argparse
 # if project_root not in sys.path:
 #     sys.path.append(project_root)
 
-from voromesh.voromesh2d import parse_input_file, computeVoronoi2d
+from voromesh.voromesh2d import parse_input_file, computeVoronoi2d_fromInputFile
 # from voromesh.voromesh3d import computeVoronoi3d  # Uncomment when 3D functionality is available
 
 def main_2d(input_file_path):
-    parameters = parse_input_file(input_file_path)
+    computeVoronoi2d_fromInputFile(input_file_path)
+    # parameters = parse_input_file(input_file_path)
 
-    # Extract parameters from the dictionary
-    boundary = parameters["boundary"]
-    N_points = parameters["N_points"]
-    points_seed = parameters["points_seed"]
-    N_iter = parameters["N_iter"]
-    edgeLength_threshold = parameters["edgeLength_threshold"]
-    boundary_optimize = parameters["boundary_optimize"]
-    visualize = parameters["visualize"]
-    figureLabels = parameters["figureLabels"]
-    figureTitle = parameters["figureTitle"]
-    saveData = parameters["saveData"]
+    # # Extract parameters from the dictionary
+    # boundary = parameters["boundary"]
+    # N_points = parameters["N_points"]
+    # points_seed = parameters["points_seed"]
+    # N_iter = parameters["N_iter"]
+    # edgeLength_threshold = parameters["edgeLength_threshold"]
+    # # boundary_optimize = parameters["boundary_optimize"]
+    # visualize = parameters["visualize"]
+    # figureLabels = parameters["figureLabels"]
+    # figureTitle = parameters["figureTitle"]
+    # saveData = parameters["saveData"]
 
-    if boundary is None:
-        print('Please at least provide an accurate path of the OBJ file as the boundary in the input file')
-        return
+    # if boundary is None:
+    #     print('Please at least provide an accurate path of the OBJ file as the boundary in the input file')
+    #     return
 
-    # Call the computeVoronoi2d function with the extracted parameters
-    computeVoronoi2d(
-        boundary=boundary,
-        N_points=N_points,
-        points_seed=points_seed,
-        N_iter=N_iter,
-        edgeLength_threshold=edgeLength_threshold,
-        boundary_optimize=boundary_optimize,
-        visualize=visualize,
-        figureLabels=figureLabels,
-        figureTitle=figureTitle,
-        saveData=saveData
-    )
+    # # Call the computeVoronoi2d function with the extracted parameters
+    # computeVoronoi2d(
+    #     boundary=boundary,
+    #     N_points=N_points,
+    #     points_seed=points_seed,
+    #     N_iter=N_iter,
+    #     edgeLength_threshold=edgeLength_threshold,
+    #     visualize=visualize,
+    #     figureLabels=figureLabels,
+    #     figureTitle=figureTitle,
+    #     saveData=saveData
+    # )
 
 def main_3d(input_file_path):
     # Placeholder for 3D Voronoi computation
