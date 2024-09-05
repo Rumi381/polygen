@@ -190,7 +190,13 @@ def plot_voronoi_edges(clipped_cells, figure_name, show_figure=True):
     axs[2].axis('off')
 
     plt.tight_layout(pad=2.0)
-    plt.savefig(figure_name, format='png', dpi=600)
+    
+    # Create 'Plots' folder if it doesn't exist
+    if not os.path.exists('Plots'):
+        os.makedirs('Plots')
+    
+    # Save the figure in the 'Plots' folder
+    plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
     if show_figure:
         plt.show()
 
