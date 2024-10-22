@@ -8,7 +8,9 @@ from shapely.ops import unary_union
 from collections import defaultdict
 
 from .geometry import Geometry
-from .voroGen import generate_poisson_points, lloyds_algorithm_polygon, generate_voronoi_cells
+from .constrainedPointGen import generate_poisson_points, generate_sequence_points
+from .constrained_lloyd import lloyd
+from .voroGen import generate_voronoi_cells
 from .optimize import collapse_short_voronoiEdges, print_short_voronoiEdges
 from .plotting import plot_boundary_with_points, plot_voronoi_cells, plot_voronoi_edges, plot_voronoi_cells_with_short_edges
 from .savingData import save_voronoi_cells_with_edges_to_py
@@ -286,7 +288,7 @@ def computeVoronoi2d(boundary, N_points, points_seed=42, N_iter=100000, edgeLeng
     # Use the generated variable names
     variables[names["polygon_region"]] = load_polygon_from_obj(boundary)
     variables[names["seed_points"]] = generate_poisson_points(variables[names["polygon_region"]], N_points, points_seed)
-    variables[names["relaxed_points"]] = lloyds_algorithm_polygon(variables[names["polygon_region"]], variables[names["seed_points"]], N_iter)
+    variables[names["relaxed_points"]] = lloyd(variables[names["polygon_region"]], variables[names["seed_points"]], N_iter)
     variables[names["voronoi_cells"]] = generate_voronoi_cells(variables[names["polygon_region"]], variables[names["relaxed_points"]])
     
     print('')

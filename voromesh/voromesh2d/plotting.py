@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from shapely.geometry import Polygon, MultiPolygon, LineString, Point
@@ -601,3 +602,55 @@ def plot_boundary_with_short_edges(figure_name, polygon, N=None, threshold=None,
     plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
     if show_figure:
         plt.show()
+
+# Function to plot the energy and norm of energy gradient vs. Lloyd's iterations graph
+def plot_energy_and_gradient(energy_list, grad_norm_list, figure_name="Energy_and _Norm_of_Energy_Gradient.png"):
+    iterations = np.arange(1, len(energy_list) + 1)
+
+    fig, ax1 = plt.subplots(figsize=(8, 6))
+
+    # Plot Energy on the left y-axis
+    ax1.set_xlabel('Iteration, $i$', fontsize=14)
+    ax1.set_ylabel(r'Energy, $\mathcal{E}$', fontsize=14, color='black')
+
+    # Plot the energy and store the label for the legend
+    line1, = ax1.plot(iterations, energy_list, 'ko-', label=r'Energy, $\mathcal{E}(P_i)$', markersize=4)
+    ax1.set_yscale('log')
+    ax1.set_xscale('log')
+    ax1.tick_params(axis='y', labelcolor='black', labelsize=12)
+    ax1.tick_params(axis='x', labelsize=12)
+
+    # Set axis limits to ensure the visibility of energy values
+    ax1.set_ylim([min(energy_list) * 0.5, max(energy_list) * 1.5])
+
+    # Add grid to the plot
+    ax1.grid(True, which='both', linestyle='--', linewidth=0.7)
+
+    # Create a second y-axis for the norm of the gradient
+    ax2 = ax1.twinx()  
+    ax2.set_ylabel(r'Norm of energy gradient, $||\nabla \mathcal{E}||$', fontsize=14, color='green')
+
+    # Plot the norm of the energy gradient and store the label for the legend
+    line2, = ax2.plot(iterations, grad_norm_list, 'gs-', label=r'Norm of energy gradient, $||\nabla \mathcal{E}(P_i)||$', markersize=4)
+    ax2.set_yscale('log')
+    ax2.tick_params(axis='y', labelcolor='green', labelsize=12)
+
+    # Set axis limits to ensure the visibility of total error values
+    ax2.set_ylim([min(grad_norm_list) * 0.5, max(grad_norm_list) * 1.5])
+
+    # Add legends for both plots (top right corner inside the grid)
+    lines = [line1, line2]
+    labels = [line.get_label() for line in lines]
+    fig.legend(lines, labels, loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes, fontsize=12)
+
+    # Set titles and layout
+    plt.title("Energy and  Norm of Energy Gradient vs Iteration", fontsize=16)
+    fig.tight_layout()
+
+    # Create 'Plots' folder if it doesn't exist
+    if not os.path.exists('Plots'):
+        os.makedirs('Plots')
+    
+    # Save the figure in the 'Plots' folder
+    plt.savefig(os.path.join('Plots', figure_name), format='png', dpi=600)
+    plt.show()

@@ -232,12 +232,50 @@ def generate_voronoi_cells(polygon, points):
     """
     Generate Voronoi cells within the given polygon for the provided points.
     
-    Parameters:
-    - polygon: Shapely Polygon or MultiPolygon within which to generate Voronoi cells.
-    - points: Points (Nx2 array) for which to generate the Voronoi diagram.
+    Parameters
+    ----------
+    polygon : shapely.geometry.Polygon or shapely.geometry.MultiPolygon
+        A Shapely Polygon or MultiPolygon defining the region within which to generate Voronoi cells.
+    points : array_like, shape (N, 2)
+        Array of (x, y) coordinates representing the points for which to generate the Voronoi diagram.
     
-    Returns:
-    - List of Shapely Polygon objects representing the clipped Voronoi cells.
+    Returns
+    -------
+    list of shapely.geometry.Polygon
+        List of Shapely Polygon objects representing the clipped Voronoi cells.
+
+    Notes
+    -----
+    This function generates Voronoi cells for a given set of points and clips them to fit within the specified
+    polygon. The Voronoi cells that fall outside the polygon are clipped, ensuring all cells lie within the polygonal
+    region. Invalid cells (empty or invalid geometries) are filtered out.
+
+    Examples
+    --------
+    Basic usage:
+    
+    >>> from shapely.geometry import Polygon
+    >>> import numpy as np
+    >>> polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+    >>> points = np.random.rand(10, 2)
+    >>> voronoi_cells = generate_voronoi_cells(polygon, points)
+    >>> len(voronoi_cells)  # Number of Voronoi cells inside the polygon
+    10
+    
+    Advanced usage with a larger domain:
+    
+    >>> large_polygon = Polygon([(-5, -5), (-5, 5), (5, 5), (5, -5)])
+    >>> points = np.random.rand(100, 2) * 10 - 5  # Random points within a larger domain
+    >>> voronoi_cells = generate_voronoi_cells(large_polygon, points)
+    >>> len(voronoi_cells)
+    100
+
+    Performance Tip
+    ---------------
+    - For a large number of points, consider generating Voronoi cells in parallel or applying a bounding box with 
+      slightly extended edges to improve performance when clipping large Voronoi regions.
+    - The quality and shape of the Voronoi cells depend on the initial distribution of points. Use more uniform
+      distributions for smoother Voronoi cells.
     """
     vor = Voronoi(points)
     min_x, min_y, max_x, max_y = polygon.bounds
