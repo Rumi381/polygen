@@ -170,7 +170,14 @@ def plot_voronoi_edges(clipped_cells, figure_name, show_figure=True):
     axs[0].axis('off')
 
     # Calculate plot limits for the whole region
-    all_coords = [coord for cell in clipped_cells for coord in cell.exterior.coords]
+    # all_coords = [coord for cell in clipped_cells for coord in cell.exterior.coords]
+    all_coords = []
+    for cell in clipped_cells:
+        if isinstance(cell, Polygon):
+            all_coords.extend(cell.exterior.coords)
+        elif isinstance(cell, MultiPolygon):
+            for poly in cell.geoms:
+                all_coords.extend(poly.exterior.coords)
     min_x, min_y = min([coord[0] for coord in all_coords]), min([coord[1] for coord in all_coords])
     max_x, max_y = max([coord[0] for coord in all_coords]), max([coord[1] for coord in all_coords])
     axs[0].set_xlim(min_x, max_x)
