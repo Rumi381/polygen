@@ -12,11 +12,11 @@ class CohesiveZoneAdjuster:
     Parameters
     ----------
     tolerance : float, optional
-        Convergence tolerance for area ratio, default=0.005
+        Convergence tolerance for area ratio (default: 0.005)
     max_iterations : int, optional
-        Maximum number of adjustment iterations, default=10
+        Maximum number of adjustment iterations (default: 10)
     verbose : bool, optional
-        Whether to print progress information, default=False
+        Whether to print progress information (default: False)
         
     Attributes
     ----------
@@ -28,17 +28,22 @@ class CohesiveZoneAdjuster:
     The adjustment process follows two possible approaches:
     
     1. Fixed thickness (t):
-       Each cell Vᵢ is scaled as V'ᵢ = S_{(1-t)}(Vᵢ)
+       Each cell V(i) is scaled as V'(i) = S(1-t)(V(i))
        
-    2. Target area ratio (r*):
-       Iteratively adjusts thickness until:
-       |rₖ - r*| ≤ ε or k > K
+    2. Target area ratio (r):
+       Iteratively adjusts thickness until one of these conditions is met:
        
-    where:
-    - S_α is the scaling operator
-    - rₖ is the area ratio at iteration k
-    - ε is the tolerance
-    - K is max_iterations
+       * The area ratio difference is within tolerance
+       * Maximum iterations are reached
+       
+       where the area ratio difference is the absolute difference between 
+       the current ratio r(k) and the target ratio r_target.
+       
+    Mathematical Details:
+       * S(α) is the scaling operator
+       * r(k) is the area ratio at iteration k
+       * The convergence criterion is: abs(current_ratio - target_ratio) ≤ tolerance
+       * The iteration limit is: current_iteration > max_iterations
     """
     
     def __init__(

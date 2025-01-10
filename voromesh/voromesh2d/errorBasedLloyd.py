@@ -130,22 +130,6 @@ def compute_weighted_centroid(X, Y, density_vals, mask, dx, dy):
     -------
     tuple
         (x_centroid, y_centroid) coordinates of the weighted centroid
-    
-    Notes
-    -----
-    The centroid of a Voronoi region Ωᵢ with density function ρ(x) is computed as:
-    
-    .. math::
-    
-        c_i = \frac{\int_{\Omega_i} \rho(x)x \, d\sigma}{\int_{\Omega_i} \rho(x) \, d\sigma}
-    
-    where:
-    
-    * :math:`\Omega_i` is the Voronoi region
-    * :math:`\rho(x)` is the density function
-    * :math:`d\sigma` is the area differential
-    
-    If the total mass (denominator) is near zero, returns the geometric centroid.
     """
     masked_density = density_vals * mask
     total_mass = np.sum(masked_density) * dx * dy
@@ -307,22 +291,6 @@ def calculate_energy(points, voronoi, polygon, density_fn, is_uniform_density):
     -------
     float
         Total energy of the configuration
-    
-    Notes
-    -----
-    The CVT energy function F(X) is defined as:
-    
-    .. math::
-    
-        F(X) = \sum_{i=1}^n \int_{\Omega_i} \rho(x)\|x - x_i\|^2 \, d\sigma
-    
-    where:
-    
-    * :math:`X = (x_i)_{i=1}^n` is the set of generator points
-    * :math:`\Omega_i` is the Voronoi cell of :math:`x_i`
-    * :math:`\rho(x)` is the density function
-    * :math:`\|x - x_i\|` is the Euclidean distance
-    * :math:`d\sigma` is the area differential
     """
     energy = 0.0
     for point_idx, region_idx in enumerate(voronoi.point_region):
@@ -435,8 +403,13 @@ def lloyd_with_density(polygon, seed_points, density_function=None, max_iteratio
     density_function : callable, optional
         A function f(x, y) -> float that defines pointwise density. If None,
         a uniform density of 1 is assumed.
-        Example density function (defined over a hexagonal domain): def hexagonDensity(x, y):
-                                                                        return np.exp(-20 * (x**2 + y**2)) + 0.05 * np.sin(np.pi * x)**2 * np.sin(np.pi * y)**2
+        Example density function:
+        
+        .. code-block:: python
+        
+            def hexagonDensity(x, y):
+                return np.exp(-20 * (x**2 + y**2)) + 0.05 * np.sin(np.pi * x)**2 * np.sin(np.pi * y)**2
+                
     max_iterations : int, optional
         Maximum number of Lloyd iterations (default=1e7).
     tol : float, optional
@@ -451,6 +424,14 @@ def lloyd_with_density(polygon, seed_points, density_function=None, max_iteratio
         Factor of tolerance for detecting error growth (default=1.2).
     history_buffer_size : int, optional
         Maximum size of the point configuration buffer (default=10).
+
+    Returns
+    -------
+    tuple
+        A tuple (points, metrics) where:
+        
+        - points: The final point configuration as a numpy array
+        - metrics: A dictionary containing convergence information and error history
 
     Notes
     -----

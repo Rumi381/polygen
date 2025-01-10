@@ -14,30 +14,18 @@ class IO:
     2. Saving Voronoi cells to various formats
     3. Exporting structured data for further analysis
     4. Handling boundary and internal edge data
-    
-    Attributes
-    ----------
-    DEFAULT_PRECISION : int
-        Default precision for coordinate values in output files
-    VORONOI_OUTPUT_DIR : str
-        Default directory for Voronoi mesh outputs
-    DATA_OUTPUT_DIR : str
-        Default directory for data file outputs
-    
-    Methods
-    -------
-    load_polygon_from_file
-        Load a polygon from mesh file or geometric object
-    save_voronoi_to_obj
-        Save Voronoi cells to OBJ format
-    save_voronoi_data
-        Save structured Voronoi data for analysis
-    save_polygon_data
-        Save polygon boundary data
     """
     
+    #: Default precision for coordinate values in output files.
+    #: :no-index:
     DEFAULT_PRECISION = 8
+    
+    #: Default directory for Voronoi mesh outputs.
+    #: :no-index:
     VORONOI_OUTPUT_DIR = "meshFiles"
+    
+    #: Default directory for data file outputs.
+    #: :no-index:
     DATA_OUTPUT_DIR = "voronoiDataFiles"
     
     @classmethod
@@ -101,16 +89,17 @@ class IO:
     def load_polygon_from_file(cls, input_source: Union[str, Dict]) -> Union[Polygon, MultiPolygon]:
         """
         Load a polygon from file or predefined geometric object.
-        
+        :no-index:
+
         Parameters
         ----------
         input_source : Union[str, Dict]
-            File path or geometric object
-            
+            File path or geometric object.
+
         Returns
         -------
         Union[Polygon, MultiPolygon]
-            Loaded geometry
+            Loaded geometry.
         """
         try:
             if isinstance(input_source, dict) and 'polygon' in input_source:
@@ -181,17 +170,18 @@ class IO:
     ) -> None:
         """
         Save Voronoi cells to OBJ format.
-        
+        :no-index:
+
         Parameters
         ----------
         voronoi_cells : List[Polygon]
-            Voronoi cells to save
+            Voronoi cells to save.
         filename : str
-            Output filename
+            Output filename.
         output_dir : Optional[str]
-            Output directory
+            Output directory.
         precision : int
-            Coordinate precision
+            Coordinate precision.
         """
         output_dir = output_dir or cls.VORONOI_OUTPUT_DIR
         cls._ensure_directory(output_dir)
@@ -260,6 +250,7 @@ class IO:
     ) -> None:
         """
         Save structured Voronoi data including edges.
+        :no-index:
         
         Parameters
         ----------
@@ -334,6 +325,7 @@ class IO:
     ) -> None:
         """
         Save polygon boundary data.
+        :no-index:
         
         Parameters
         ----------

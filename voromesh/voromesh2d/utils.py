@@ -111,63 +111,75 @@ def generate_variable_names(input_obj):
 # Function to create the 2D Voronoi mesh from the given parameters
 def computeVoronoi2d(boundary, N_points, points_seed=42, margin=0.01, N_iter=100000, use_decay=True, edgeLength_threshold=None, cohesiveThickness=None, triangularMesh_minLength=None,  visualize=False, saveData=True):
     """
-    Compute and visualize Voronoi diagrams within an arbitrarily shaped 2D region, 
-    with options for edge collapsing and boundary optimization. This function 
-    integrates various stages of Voronoi diagram generation and provides visualization
-    and data-saving capabilities.
-
-    Parameters:
-    - boundary: The path to the OBJ file defining the boundary.
-    - N_points: Number of initial seed points for the Voronoi diagram.
-    - points_seed: Random seed for generating initial Poisson disk sampling points.
-    - margin: Margin to add around the boundary for generating seed points.
-    - N_iter: Number of iterations for Lloyd's algorithm to relax the points.
-    - use_decay: Boolean indicating whether to use decay in Lloyd's algorithm.
-    - edgeLength_threshold: Length threshold for collapsing short edges in the Voronoi diagram.
-    - cohesiveThickness: Thickness of the cohesive zone for adjusting the Voronoi cells.
-    - triangularMesh_minLength: Minimum edge length for triangular meshing.
-    - saveData: Boolean indicating whether to save the resulting data structures to .py files.
-
-    Use Cases:
-    1. **Basic Voronoi Diagram Generation**:
-       - Generate and visualize a Voronoi diagram within a given boundary with a specified number of seed points.
-       - Example: `computeVoroni('boundary.obj', 100, visualize=True)`
+    Compute and visualize Voronoi diagrams within an arbitrarily shaped 2D region.
     
-    2. **Optimized Voronoi Diagram with Edge Collapsing**:
-       - Generate a Voronoi diagram and collapse edges shorter than a specified length threshold.
-       - Example: `computeVoroni('boundary.obj', 100, edgeLength_threshold=0.1, visualize=True)`
+    This function integrates various stages of Voronoi diagram generation and provides 
+    visualization and data-saving capabilities.
+
+    Parameters
+    ----------
+    boundary : str or dict
+        The path to the OBJ file defining the boundary or predefined geometry object
+    N_points : int
+        Number of initial seed points for the Voronoi diagram
+    points_seed : int, optional
+        Random seed for generating initial Poisson disk sampling points (default: 42)
+    margin : float, optional
+        Margin to add around the boundary for generating seed points (default: 0.01)
+    N_iter : int, optional
+        Number of iterations for Lloyd's algorithm to relax the points (default: 100000)
+    use_decay : bool, optional
+        Whether to use decay in Lloyd's algorithm (default: True)
+    edgeLength_threshold : float, optional
+        Length threshold for collapsing short edges in the Voronoi diagram (default: None)
+    cohesiveThickness : float, optional
+        Thickness of the cohesive zone for adjusting the Voronoi cells (default: None)
+    triangularMesh_minLength : float, optional
+        Minimum edge length for triangular meshing (default: None)
+    visualize : bool, optional
+        Whether to show visualization plots (default: False)
+    saveData : bool, optional
+        Whether to save the resulting data structures to files (default: True)
+
+    Use Cases
+    ---------
+    1. Basic Voronoi Diagram Generation:
+       Generate and visualize a Voronoi diagram within a given boundary.
+       Example: computeVoroni('boundary.obj', 100, visualize=True)
     
-    3. **Data Saving**:
-       - Save the resulting Voronoi cell and boundary data to .py files for further use in Abaqus.
-       - Example: `computeVoroni('boundary.obj', 100, saveData=True)`
+    2. Optimized Voronoi Diagram with Edge Collapsing:
+       Generate a Voronoi diagram and collapse edges shorter than a threshold.
+       Example: computeVoroni('boundary.obj', 100, edgeLength_threshold=0.1)
+    
+    3. Data Saving:
+       Save the resulting Voronoi cell and boundary data to files.
+       Example: computeVoroni('boundary.obj', 100, saveData=True)
 
-    Workflow:
-    1. Load the polygonal boundary from the specified OBJ file.
-    2. Generate initial Poisson disk sampling points within the boundary.
-    3. Relax the points using Lloyd's algorithm for a specified number of iterations.
-    4. Generate Voronoi cells based on the relaxed points.
-    5. Optionally collapse short edges in the Voronoi cells and optimize the Voronoi mesh.
-    6. Visualize the results and save the plots, if requested.
-    7. Save the Voronoi cell and boundary data to .py files, if requested.
+    Workflow
+    --------
+    1. Load the polygonal boundary from the specified OBJ file
+    2. Generate initial Poisson disk sampling points within the boundary
+    3. Relax the points using Lloyd's algorithm
+    4. Generate Voronoi cells based on the relaxed points
+    5. Optionally collapse short edges and optimize the mesh
+    6. Visualize results and save plots if requested
+    7. Save data to files if requested
 
-    Example usage:
-    -   computeVoroni(
-            boundary='boundary.obj',
-            N_points=100,
-            points_seed=42,
-            margin=0.01,
-            N_iter=100000,
-            use_decay=True,
-            edgeLength_threshold=0.1,
-            cohesiveThickness=0.1,
-            triangularMesh_minLength=0.02,
-            visualize=True,
-            saveData=True
-    )
-
-    This example will generate a Voronoi diagram within the specified boundary, 
-    collapse short edges below a threshold, optimize the boundary, visualize the 
-    process with labels and titles, and save the resulting data structures to .py files.
+    Example
+    -------
+    >>> computeVoroni(
+    ...     boundary='boundary.obj',
+    ...     N_points=100,
+    ...     points_seed=42,
+    ...     margin=0.01,
+    ...     N_iter=100000,
+    ...     use_decay=True,
+    ...     edgeLength_threshold=0.1,
+    ...     cohesiveThickness=0.1,
+    ...     triangularMesh_minLength=0.02,
+    ...     visualize=True,
+    ...     saveData=True
+    ... )
     """
     start_time = time.time()  # Start timing
 
@@ -376,7 +388,7 @@ def print_docstring(obj):
     others = []
     current_section = summary
 
-    param_pattern = re.compile(r'\s*- \w+:')
+    # param_pattern = re.compile(r'\s*- \w+:')
 
     for line in lines:
         stripped_line = line.strip()

@@ -1,0 +1,13 @@
+# This is a comment
+#boundary = Geometry.annular_region((0.0, -0.075), point_outer=(0.0, 1.49), center_inner=(0.0, -0.425), point_inner=(0.0, 0.5), name='Calcite_region360d')
+boundary = ./examples/CalciteBoundaryFromPNG.obj
+N_points = 1000
+points_seed = 7845
+margin = 0.01
+N_iter = 10000000
+use_decay = True
+edgeLength_threshold = 6.3
+cohesiveThickness = 0.02
+triangularMesh_minLength = 15
+visualize = True
+saveData = True

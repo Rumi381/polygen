@@ -8,88 +8,95 @@ class Geometry:
     """
     A class for generating various geometric shapes as Shapely polygons.
 
-    Methods:
-    - circle(center, radius=None, point=None, name='Circle'):
+    Methods
+    -------
+    circle(center, radius=None, point=None, name='Circle')
         Create a circular region given the center and either a radius or a point on the circle.
     
-    - annular_region(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, name='AnnularRegion'):
+    annular_region(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, name='AnnularRegion')
         Create an annular region (a ring-shaped region) with specified outer and inner circles.
     
-    - annular_region_arc_WithStraightEnds(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, theta=0, axis='x', alpha=None, name='AnnularRegionArcWithStraightEnds'):
+    annular_region_arc_WithStraightEnds(...)
         Create an annular region arc with straight ends using circular arcs.
     
-    - annular_region_arc_WithRoundedEnds(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, theta=0, axis='x', alpha=None, name='AnnularRegionArcWithRoundedEnds'):
+    annular_region_arc_WithRoundedEnds(...)
         Create an annular region arc with smoothly closed ends using circular arcs.
     
-    - ellipse(center, semi_major_axis, semi_minor_axis, rotation=0, name='Ellipse'):
+    ellipse(center, semi_major_axis, semi_minor_axis, rotation=0, name='Ellipse')
         Create an elliptical region.
     
-    - annular_ellipse(center, semi_major_axis_outer, semi_minor_axis_outer, semi_major_axis_inner, semi_minor_axis_inner, rotation=0, name='AnnularEllipse'):
+    annular_ellipse(...)
         Create an annular elliptical region.
     
-    - rectangle(width, height, name='Rectangle'):
+    rectangle(width, height, name='Rectangle')
         Create a rectangular region using width and height.
     
-    - rectangle_corners(point1, point2, name='RectangleCorners'):
+    rectangle_corners(point1, point2, name='RectangleCorners')
         Create a rectangular region using two opposite corners.
     
-    - square(center, side_length, name='Square'):
+    square(center, side_length, name='Square')
         Create a square region given the center and side length.
     
-    - regular_polygon(center, radius, num_sides, name='RegularPolygon'):
+    regular_polygon(center, radius, num_sides, name='RegularPolygon')
         Create a regular polygon with a given number of sides.
     
-    - triangle(point1, point2, point3, name='Triangle'):
+    triangle(point1, point2, point3, name='Triangle')
         Create a triangular region using three vertices.
     
-    - pentagon(center, radius, name='Pentagon'):
+    pentagon(center, radius, name='Pentagon')
         Create a pentagonal region.
     
-    - hexagon(center, radius, name='Hexagon'):
+    hexagon(center, radius, name='Hexagon')
         Create a hexagonal region.
     
-    - octagon(center, radius, name='Octagon'):
+    octagon(center, radius, name='Octagon')
         Create an octagonal region.
     
-    - star(center, outer_radius, inner_radius, num_points, name='Star'):
+    star(center, outer_radius, inner_radius, num_points, name='Star')
         Create a star-shaped polygon.
     
-    - trapezoid(base1, base2, height, name='Trapezoid'):
+    trapezoid(base1, base2, height, name='Trapezoid')
         Create a trapezoidal region given the lengths of the bases and height.
     
-    - parallelogram(base, side_length, height, name='Parallelogram'):
+    parallelogram(base, side_length, height, name='Parallelogram')
         Create a parallelogram given the base, side length, and height.
 
-    Example usage:
-    ```python
-    from voronoi_meshing.geometry import Geometry
+    Examples
+    --------
+    >>> from voronoi_meshing.geometry import Geometry
+    >>> 
+    >>> # Create a circle
+    >>> circle1 = Geometry.circle((0, 0), radius=5, name='CircleByRadius')
+    >>> circle2 = Geometry.circle((0, 0), point=(3, 4), name='CircleByPoint')
+    >>> 
+    >>> # Create an annular region
+    >>> annular1 = Geometry.annular_region((0, 0), radius_outer=10, center_inner=(0, 0),
+    ...                                   radius_inner=5, name='AnnularByRadius')
+    >>> annular2 = Geometry.annular_region((0, 0), point_outer=(7, 7), center_inner=(0, -1),
+    ...                                   point_inner=(3, 4), name='AnnularByPoint')
+    >>> 
+    >>> # Create an elliptical region
+    >>> ellipse = Geometry.ellipse(center=(0, 0), semi_major_axis=7,
+    ...                          semi_minor_axis=4, rotation=30, name='Ellipse')
+    >>> 
+    >>> # Create a rectangular region
+    >>> rectangle = Geometry.rectangle(width=10, height=5, name='Rectangle')
+    >>> 
+    >>> # Create a star-shaped region
+    >>> star = Geometry.star(center=(0, 0), outer_radius=7,
+    ...                    inner_radius=3, num_points=5, name='Star')
 
-    # Create a circle
-    circle1 = Geometry.circle((0, 0), radius=5, name='CircleByRadius')
-    circle2 = Geometry.circle((0, 0), point=(3, 4), name='CircleByPoint')
-
-    # Create an annular region
-    annular1 = Geometry.annular_region((0, 0), radius_outer=10, center_inner=(0, 0), radius_inner=5, name='AnnularByRadius')
-    annular2 = Geometry.annular_region((0, 0), point_outer=(7, 7), center_inner=(0, -1), point_inner=(3, 4), name='AnnularByPoint')
-
-    # Create an elliptical region
-    ellipse = Geometry.ellipse(center=(0, 0), semi_major_axis=7, semi_minor_axis=4, rotation=30, name='Ellipse')
-
-    # Create a rectangular region
-    rectangle = Geometry.rectangle(width=10, height=5, name='Rectangle')
-
-    # Create a star-shaped region
-    star = Geometry.star(center=(0, 0), outer_radius=7, inner_radius=3, num_points=5, name='Star')
-    ```
-
+    Returns
+    -------
     Each method returns a dictionary containing:
-    - 'polygon': The Shapely polygon object.
-    - 'name': The name of the geometry.
+        - 'polygon': The Shapely polygon object
+        - 'name': The name of the geometry
     """
     @staticmethod
     def circle(center, radius=None, point=None, name='Circle'):
         """
         Create a circular region.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the circle.
@@ -117,6 +124,7 @@ class Geometry:
     def annular_region(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, name='AnnularRegion'):
         """
         Create an annular region (a ring-shaped region).
+        :no-index:
         
         Parameters:
         - center_outer: Tuple (x, y) representing the center of the outer circle.
@@ -153,6 +161,7 @@ class Geometry:
     def annular_region_arc_WithStraightEnds(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, theta=0, axis='x', alpha=None, name='AnnularRegionArcWithStraightEnds'):
         """
         Create an annular region arc where the ends are closed by straight lines.
+        :no-index:
         
         Parameters:
         - center_outer: Tuple (x, y) representing the center of the outer circle.
@@ -218,6 +227,7 @@ class Geometry:
     def annular_region_arc_WithRoundedEnds(center_outer, radius_outer=None, point_outer=None, center_inner=None, radius_inner=None, point_inner=None, theta=0, axis='x', alpha=None, name='AnnularRegionArcWithRoundedEnds'):
         """
         Create an annular region arc with smoothly closed ends using circular arcs.
+        :no-index:
         
         Parameters:
         - center_outer, center_inner: Centers of the outer and inner circles.
@@ -308,6 +318,7 @@ class Geometry:
     def ellipse(center, semi_major_axis, semi_minor_axis, rotation=0, name='Ellipse'):
         """
         Create an elliptical region.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) for the center of the ellipse.
@@ -331,6 +342,7 @@ class Geometry:
     def annular_ellipse(center, semi_major_axis_outer, semi_minor_axis_outer, semi_major_axis_inner, semi_minor_axis_inner, rotation=0, name='AnnularEllipse'):
         """
         Create an annular elliptical region.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the ellipses.
@@ -362,6 +374,7 @@ class Geometry:
     def rectangle(width, height, name='Rectangle'):
         """
         Create a rectangular region using width and height.
+        :no-index:
         
         Parameters:
         - width: Width of the rectangle.
@@ -381,6 +394,7 @@ class Geometry:
     def rectangle_corners(point1, point2, name='RectangleCorners'):
         """
         Create a rectangular region using two opposite corners.
+        :no-index:
         
         Parameters:
         - point1: Tuple (x, y) for one corner of the rectangle.
@@ -402,6 +416,7 @@ class Geometry:
     def square(center, side_length, name='Square'):
         """
         Create a square region given the center and side length.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the square.
@@ -427,6 +442,7 @@ class Geometry:
     def regular_polygon(center, radius, num_sides, name='RegularPolygon'):
         """
         Create a regular polygon with a given number of sides.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the polygon.
@@ -453,6 +469,7 @@ class Geometry:
     def triangle(point1, point2, point3, name='Triangle'):
         """
         Create a triangular region using three vertices.
+        :no-index:
         
         Parameters:
         - point1: Tuple (x, y) for the first vertex of the triangle.
@@ -473,6 +490,7 @@ class Geometry:
     def pentagon(center, radius, name='Pentagon'):
         """
         Create a pentagonal region.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the pentagon.
@@ -491,6 +509,7 @@ class Geometry:
     def hexagon(center, radius, name='Hexagon'):
         """
         Create a hexagonal region.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the hexagon.
@@ -509,6 +528,7 @@ class Geometry:
     def octagon(center, radius, name='Octagon'):
         """
         Create an octagonal region.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the octagon.
@@ -527,6 +547,7 @@ class Geometry:
     def star(center, outer_radius, inner_radius, num_points, name='Star'):
         """
         Create a star-shaped polygon.
+        :no-index:
         
         Parameters:
         - center: Tuple (x, y) representing the center of the star.
@@ -555,6 +576,7 @@ class Geometry:
     def trapezoid(base1, base2, height, name='Trapezoid'):
         """
         Create a trapezoidal region given the lengths of the bases and height.
+        :no-index:
         
         Parameters:
         - base1: Length of the first base.
@@ -579,6 +601,7 @@ class Geometry:
     def parallelogram(base, side_length, height, name='Parallelogram'):
         """
         Create a parallelogram given the base, side length, and height.
+        :no-index:
         
         Parameters:
         - base: Length of the base.
@@ -599,32 +622,46 @@ class Geometry:
     def rectangle_with_circular_hole(rect_point1, rect_point2, circle_center, circle_radius=None, circle_point=None, name='RectangleWithCircularHole'):
         """
         Create a rectangular region with a circular hole or cut.
+        :no-index:
         
-        This method creates a geometry where a circular region is subtracted from a rectangular region.
+        Creates a geometry where a circular region is subtracted from a rectangular region.
         The result depends on the relative positions of the rectangle and circle:
-        - If the circle is completely inside the rectangle, it creates a circular hole
-        - If the circle intersects the rectangle, it cuts out the intersecting portion
-        - If the circle is completely outside the rectangle, it returns the original rectangle
         
-        Parameters:
-        - rect_point1: Tuple (x, y) for the first corner of the rectangle
-        - rect_point2: Tuple (x, y) for the opposite corner of the rectangle
-        - circle_center: Tuple (x, y) representing the center of the circle
-        - circle_radius: Radius of the circle (optional if circle_point is provided)
-        - circle_point: Tuple (x, y) representing a point on the circle (optional if circle_radius is provided)
-        - name: Name of the geometry
+        * If the circle is completely inside the rectangle, it creates a circular hole
+        * If the circle intersects the rectangle, it cuts out the intersecting portion
+        * If the circle is completely outside the rectangle, it returns the original rectangle
         
-        Returns:
-        - A dictionary with 'polygon' as the key for the Shapely polygon object and 'name' as the key for the name of the geometry
+        Parameters
+        ----------
+        rect_point1 : tuple
+            (x, y) coordinates for the first corner of the rectangle
+        rect_point2 : tuple
+            (x, y) coordinates for the opposite corner of the rectangle
+        circle_center : tuple
+            (x, y) coordinates representing the center of the circle
+        circle_radius : float, optional
+            Radius of the circle (required if circle_point is not provided)
+        circle_point : tuple, optional
+            (x, y) coordinates of a point on the circle (required if circle_radius is not provided)
+        name : str, optional
+            Name of the geometry (default: 'RectangleWithCircularHole')
         
-        Example usage:
-        - rect_with_hole = Geometry.rectangle_with_circular_hole(
-            rect_point1=(0, 0), 
-            rect_point2=(10, 5), 
-            circle_center=(5, 2.5), 
-            circle_radius=1, 
-            name='RectWithCentralHole'
-          )
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - 'polygon': The Shapely polygon object
+            - 'name': The name of the geometry
+        
+        Examples
+        --------
+        >>> rect_with_hole = Geometry.rectangle_with_circular_hole(
+        ...     rect_point1=(0, 0),
+        ...     rect_point2=(10, 5),
+        ...     circle_center=(5, 2.5),
+        ...     circle_radius=1,
+        ...     name='RectWithCentralHole'
+        ... )
         """
         # First, create the rectangle using the existing method
         rectangle_geom = Geometry.rectangle_corners(rect_point1, rect_point2)

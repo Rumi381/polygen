@@ -67,45 +67,8 @@ class ConstrainedPointGenerator:
     Poisson Disc Sampling generates points such that no two points are closer than a specified radius, making it
     useful for applications like blue-noise sampling or spatial point distributions with minimum separation.
 
-    The Poisson Disc Sampling method generates a set of points P = {pᵢ}ⁿᵢ₌₁ such that:
-    
-    .. math::
-    
-        \forall p_i, p_j \in P, i \neq j: \|p_i - p_j\| \geq r
-        
-    where:
-    
-    * r is the minimum distance between any two points
-    * ‖·‖ denotes the Euclidean norm
-    
-    The radius r is computed based on the target density:
-    
-    .. math::
-    
-        r = \sqrt{\frac{|\Omega|}{n\pi}} \cdot 2
-    
-    where |Ω| is the area of the domain.
-    
     Quasi-random sequences (Sobol and Halton) generate points that cover the space more uniformly than pure random
     sampling, making them suitable for integration and optimization problems.
-
-    For quasi-random sequences, the points are generated using either:
-    
-    1. Sobol sequence: Points (xᵢ) where each coordinate is generated using:
-    
-    .. math::
-    
-        x_i = \sum_{j=1}^m v_{j} \cdot b_{i,j}
-    
-    where vⱼ are direction numbers and bᵢ,ⱼ are binary digits.
-    
-    2. Halton sequence: Points (xᵢ) where each coordinate is generated using:
-    
-    .. math::
-    
-        x_i = \sum_{j=1}^{\infty} \frac{a_j(i)}{b^j}
-    
-    where b is the base and aⱼ(i) are digits in base-b representation.
 
     Examples
     --------
@@ -264,6 +227,7 @@ class ConstrainedPointGenerator:
 
     def generate_poisson_points(self):
         """
+        :no-index:
         Generate N points using Poisson Disc Sampling inside the polygon.
 
         This method applies binary search over the radius to ensure that the number
@@ -334,6 +298,7 @@ class ConstrainedPointGenerator:
 
     def generate_sequence_points(self, use_sobol=False):
         """
+        :no-index:
         Generate N points using a quasi-random sequence (Sobol or Halton) inside the polygon.
 
         Parameters
@@ -419,83 +384,64 @@ class ConstrainedPointGenerator:
 # Helper functions to create and use the ConstrainedPointGenerator
 def generate_poisson_points(domain, N, seed=None, k=30, margin=0.01, tolerance=0.01, max_iterations=50):
     """
-    Generate N points inside a polygon using Poisson Disc Sampling.
-
+    Wrapper function for ConstrainedPointGenerator.generate_poisson_points().
+    :no-index:
+    
+    For detailed documentation, see :meth:`ConstrainedPointGenerator.generate_poisson_points`.
+    
     Parameters
     ----------
     domain : Polygon or MultiPolygon
-        A Shapely polygon or multipolygon that defines the boundary within which the points are generated.
+        A Shapely polygon or multipolygon that defines the boundary.
     N : int
         The target number of points to generate.
     seed : int or None, optional
-        Seed for the random number generator. Default is None.
+        Random number generator seed.
     k : int, optional
-        Number of attempts to place a new point during Poisson Disc Sampling. Default is 30.
+        Number of point placement attempts.
     margin : float, optional
-        A small margin to shrink the polygon before generating points. This helps to avoid boundary points.
-        Default is 0.01.
+        Boundary margin.
     tolerance : float, optional
-        Tolerance for the number of generated points. Default is 0.01.
+        Point count tolerance.
     max_iterations : int, optional
-        Maximum number of iterations for radius adjustment during Poisson Disc Sampling. Default is 50.
+        Maximum radius adjustment iterations.
 
     Returns
     -------
-    points : numpy.ndarray, shape (N, 2)
-        Array of generated points inside the polygon.
-
-    Examples
-    --------
-    >>> polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-    >>> points = generate_poisson_points(polygon, 100)
-    >>> print(points.shape)
-    (100, 2)
-
-    Performance Tip
-    ---------------
-    If the result is not close to N points, increase the number of iterations or reduce the margin.
+    numpy.ndarray
+        Array of generated points.
     """
     generator = ConstrainedPointGenerator(domain, N, seed, k, margin, tolerance, max_iterations)
     return generator.generate_poisson_points()
 
 def generate_sequence_points(domain, N, seed=None, margin=0.01, use_sobol=False, workers=None, optimization=None):
     """
-    Generate N points inside a polygon using a quasi-random sequence (Sobol or Halton).
-
+    Wrapper function for ConstrainedPointGenerator.generate_sequence_points().
+    :no-index:
+    
+    For detailed documentation, see :meth:`ConstrainedPointGenerator.generate_sequence_points`.
+    
     Parameters
     ----------
     domain : Polygon or MultiPolygon
-        A Shapely polygon or multipolygon that defines the boundary within which the points are generated.
+        A Shapely polygon or multipolygon that defines the boundary.
     N : int
         The target number of points to generate.
     seed : int or None, optional
-        Seed for the random number generator. Default is None.
+        Random number generator seed.
     margin : float, optional
-        A small margin to shrink the polygon before generating points. This helps to avoid boundary points.
-        Default is 0.01.
+        Boundary margin.
     use_sobol : bool, optional
-        If True, use the Sobol sequence for point generation. Otherwise, use the Halton sequence.
-        Default is False (use Halton).
+        Whether to use Sobol sequence.
     workers : int or None, optional
-        Number of workers to use for parallel processing. Default is None.
+        Number of parallel workers.
     optimization : str or None, optional
-        Optimization scheme for quasi-random sequences (Sobol or Halton). Default is None.
+        Sequence optimization scheme.
 
     Returns
     -------
-    points : numpy.ndarray, shape (N, 2)
-        Array of generated points inside the polygon.
-
-    Examples
-    --------
-    >>> polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-    >>> points_sobol = generate_sequence_points(polygon, 128, use_sobol=True)
-    >>> print(points_sobol.shape)
-    (128, 2)
-
-    Performance Tip
-    ---------------
-    For larger point sets, prefer Sobol sequences for better space-filling properties.
+    numpy.ndarray
+        Array of generated points.
     """
     generator = ConstrainedPointGenerator(domain, N, seed, margin=margin, workers=workers, optimization=optimization)
     return generator.generate_sequence_points(use_sobol)
