@@ -66,9 +66,46 @@ class ConstrainedPointGenerator:
     -----
     Poisson Disc Sampling generates points such that no two points are closer than a specified radius, making it
     useful for applications like blue-noise sampling or spatial point distributions with minimum separation.
+
+    The Poisson Disc Sampling method generates a set of points P = {pᵢ}ⁿᵢ₌₁ such that:
+    
+    .. math::
+    
+        \forall p_i, p_j \in P, i \neq j: \|p_i - p_j\| \geq r
+        
+    where:
+    
+    * r is the minimum distance between any two points
+    * ‖·‖ denotes the Euclidean norm
+    
+    The radius r is computed based on the target density:
+    
+    .. math::
+    
+        r = \sqrt{\frac{|\Omega|}{n\pi}} \cdot 2
+    
+    where |Ω| is the area of the domain.
     
     Quasi-random sequences (Sobol and Halton) generate points that cover the space more uniformly than pure random
     sampling, making them suitable for integration and optimization problems.
+
+    For quasi-random sequences, the points are generated using either:
+    
+    1. Sobol sequence: Points (xᵢ) where each coordinate is generated using:
+    
+    .. math::
+    
+        x_i = \sum_{j=1}^m v_{j} \cdot b_{i,j}
+    
+    where vⱼ are direction numbers and bᵢ,ⱼ are binary digits.
+    
+    2. Halton sequence: Points (xᵢ) where each coordinate is generated using:
+    
+    .. math::
+    
+        x_i = \sum_{j=1}^{\infty} \frac{a_j(i)}{b^j}
+    
+    where b is the base and aⱼ(i) are digits in base-b representation.
 
     Examples
     --------
@@ -114,66 +151,21 @@ class ConstrainedPointGenerator:
         self.workers = workers if workers is not None else (os.cpu_count() if N >= 1000 else 1)
         self.optimization = optimization
 
-    # def _generate_points(self, radius, shrunk_polygon):
-    #     minx, miny, maxx, maxy = shrunk_polygon.bounds
-    #     width, height = maxx - minx, maxy - miny
-    #     cell_size = radius / np.sqrt(2)
-    #     cols, rows = int(np.ceil(width / cell_size)), int(np.ceil(height / cell_size))
-    #     grid = np.full((rows, cols), -1, dtype=int)
-    #     points = []
-    #     active = []
-        
-    #     # Generate first point
-    #     while True:
-    #         x, y = self.rng.uniform(minx, maxx), self.rng.uniform(miny, maxy)
-    #         if shrunk_polygon.contains(Point(x, y)):
-    #             points.append((x, y))
-    #             active.append(0)
-    #             break
-        
-    #     while active:
-    #         idx = self.rng.choice(active)
-    #         found = False
-    #         for _ in range(self.k):
-    #             angle = self.rng.uniform(0, 2 * np.pi)
-    #             r = self.rng.uniform(radius, 2 * radius)
-    #             new_x, new_y = points[idx][0] + r * np.cos(angle), points[idx][1] + r * np.sin(angle)
-                
-    #             if minx <= new_x < maxx and miny <= new_y < maxy:
-    #                 col, row = int((new_x - minx) / cell_size), int((new_y - miny) / cell_size)
-                    
-    #                 if grid[row, col] == -1:
-    #                     new_point = Point(new_x, new_y)
-    #                     if shrunk_polygon.contains(new_point):
-    #                         near_idx = grid[max(0, row-2):row+3, max(0, col-2):col+3].ravel()
-    #                         near_idx = near_idx[near_idx != -1]
-    #                         if all((new_x - points[i][0])**2 + (new_y - points[i][1])**2 >= radius**2 for i in near_idx):
-    #                             points.append((new_x, new_y))
-    #                             grid[row, col] = len(points) - 1
-    #                             active.append(len(points) - 1)
-    #                             found = True
-    #                             break
-            
-    #         if not found:
-    #             active.remove(idx)
-        
-    #     return np.array(points)
-
     def _generate_points(self, radius, shrunk_polygon):
         """
-        Generate points using Poisson Disc Sampling with a given radius inside a shrunk polygon.
-
+        Generate points using Poisson Disc Sampling with specified radius.
+        
         Parameters
         ----------
         radius : float
-            The radius used to place points at least this distance apart.
-        shrunk_polygon : Polygon or MultiPolygon
-            A polygon shrunk by the margin to avoid boundary points.
-
+            Minimum distance between points
+        shrunk_polygon : Polygon
+            Polygon shrunk by margin to avoid boundary points
+            
         Returns
         -------
-        points : numpy.ndarray, shape (M, 2)
-            Array of M generated points with (x, y) coordinates.
+        numpy.ndarray
+            Array of generated points, shape (M, 2)
         """
         minx, miny, maxx, maxy = shrunk_polygon.bounds
         width, height = maxx - minx, maxy - miny
@@ -287,10 +279,6 @@ class ConstrainedPointGenerator:
         ValueError
             If the input polygon is invalid or the margin is too large.
 
-        Notes
-        -----
-        Poisson Disc Sampling generates well-spaced points, making it ideal for generating blue-noise samples.
-
         Examples
         --------
         >>> from shapely.geometry import Polygon
@@ -379,10 +367,6 @@ class ConstrainedPointGenerator:
         >>> print(points_halton.shape)
         (100, 2)
 
-        Notes
-        -----
-        Sobol sequences are best for larger point sets because they are optimized for space-filling.
-
         Performance Tip
         ---------------
         If using the Sobol sequence, note that it generates points in powers of two. Ensure that N is a power
@@ -433,13 +417,13 @@ class ConstrainedPointGenerator:
         return result
 
 # Helper functions to create and use the ConstrainedPointGenerator
-def generate_poisson_points(polygon, N, seed=None, k=30, margin=0.01, tolerance=0.01, max_iterations=50):
+def generate_poisson_points(domain, N, seed=None, k=30, margin=0.01, tolerance=0.01, max_iterations=50):
     """
     Generate N points inside a polygon using Poisson Disc Sampling.
 
     Parameters
     ----------
-    polygon : Polygon or MultiPolygon
+    domain : Polygon or MultiPolygon
         A Shapely polygon or multipolygon that defines the boundary within which the points are generated.
     N : int
         The target number of points to generate.
@@ -471,16 +455,16 @@ def generate_poisson_points(polygon, N, seed=None, k=30, margin=0.01, tolerance=
     ---------------
     If the result is not close to N points, increase the number of iterations or reduce the margin.
     """
-    generator = ConstrainedPointGenerator(polygon, N, seed, k, margin, tolerance, max_iterations)
+    generator = ConstrainedPointGenerator(domain, N, seed, k, margin, tolerance, max_iterations)
     return generator.generate_poisson_points()
 
-def generate_sequence_points(polygon, N, seed=None, margin=0.01, use_sobol=False, workers=None, optimization=None):
+def generate_sequence_points(domain, N, seed=None, margin=0.01, use_sobol=False, workers=None, optimization=None):
     """
     Generate N points inside a polygon using a quasi-random sequence (Sobol or Halton).
 
     Parameters
     ----------
-    polygon : Polygon or MultiPolygon
+    domain : Polygon or MultiPolygon
         A Shapely polygon or multipolygon that defines the boundary within which the points are generated.
     N : int
         The target number of points to generate.
@@ -513,5 +497,5 @@ def generate_sequence_points(polygon, N, seed=None, margin=0.01, use_sobol=False
     ---------------
     For larger point sets, prefer Sobol sequences for better space-filling properties.
     """
-    generator = ConstrainedPointGenerator(polygon, N, seed, margin=margin, workers=workers, optimization=optimization)
+    generator = ConstrainedPointGenerator(domain, N, seed, margin=margin, workers=workers, optimization=optimization)
     return generator.generate_sequence_points(use_sobol)

@@ -594,3 +594,70 @@ class Geometry:
         """
         parallelogram = Polygon([(0, 0), (base, 0), (base + side_length, height), (side_length, height)])
         return {'polygon': parallelogram, 'name': name}
+    
+    @staticmethod
+    def rectangle_with_circular_hole(rect_point1, rect_point2, circle_center, circle_radius=None, circle_point=None, name='RectangleWithCircularHole'):
+        """
+        Create a rectangular region with a circular hole or cut.
+        
+        This method creates a geometry where a circular region is subtracted from a rectangular region.
+        The result depends on the relative positions of the rectangle and circle:
+        - If the circle is completely inside the rectangle, it creates a circular hole
+        - If the circle intersects the rectangle, it cuts out the intersecting portion
+        - If the circle is completely outside the rectangle, it returns the original rectangle
+        
+        Parameters:
+        - rect_point1: Tuple (x, y) for the first corner of the rectangle
+        - rect_point2: Tuple (x, y) for the opposite corner of the rectangle
+        - circle_center: Tuple (x, y) representing the center of the circle
+        - circle_radius: Radius of the circle (optional if circle_point is provided)
+        - circle_point: Tuple (x, y) representing a point on the circle (optional if circle_radius is provided)
+        - name: Name of the geometry
+        
+        Returns:
+        - A dictionary with 'polygon' as the key for the Shapely polygon object and 'name' as the key for the name of the geometry
+        
+        Example usage:
+        - rect_with_hole = Geometry.rectangle_with_circular_hole(
+            rect_point1=(0, 0), 
+            rect_point2=(10, 5), 
+            circle_center=(5, 2.5), 
+            circle_radius=1, 
+            name='RectWithCentralHole'
+          )
+        """
+        # First, create the rectangle using the existing method
+        rectangle_geom = Geometry.rectangle_corners(rect_point1, rect_point2)
+        rectangle = rectangle_geom['polygon']
+        
+        # Create the circle using the existing method
+        circle_geom = Geometry.circle(circle_center, radius=circle_radius, point=circle_point)
+        circle = circle_geom['polygon']
+        
+        # Check if the circle intersects with the rectangle
+        if not circle.intersects(rectangle):
+            # If the circle is completely outside the rectangle
+            print("Note: The circular region does not intersect with the rectangular region. Returning the original rectangle.")
+            return {'polygon': rectangle, 'name': name}
+        
+        # Get the minimum and maximum coordinates of both shapes
+        rect_minx, rect_miny, rect_maxx, rect_maxy = rectangle.bounds
+        circ_minx, circ_miny, circ_maxx, circ_maxy = circle.bounds
+        
+        # Check if the circle is completely inside the rectangle
+        circle_inside = (
+            circ_minx >= rect_minx and
+            circ_miny >= rect_miny and
+            circ_maxx <= rect_maxx and
+            circ_maxy <= rect_maxy
+        )
+        
+        if circle_inside:
+            print("Note: The circular region is completely inside the rectangular region. Creating a hole.")
+        else:
+            print("Note: The circular region intersects with the rectangular region. Cutting out the intersecting portion.")
+        
+        # Subtract the circle from the rectangle
+        result = rectangle.difference(circle)
+        
+        return {'polygon': result, 'name': name}

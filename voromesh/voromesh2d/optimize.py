@@ -1,318 +1,319 @@
+from typing import List, Tuple, Union, Optional, Dict
 from shapely.geometry import Polygon, MultiPolygon, LineString
 from shapely.ops import unary_union
 
-# ===============================================================================
-# ===============================================================================
-# Fuctions to optimize generated Voronoi cells by collapsing targeted short edges
-
-# Function to analyze the short edges of the generated Voronoi cells
-def print_short_voronoiEdges(voronoi_cells, N=None, threshold=None):
+class MeshOptimizer:
     """
-    Print the lengths of the edges in the Voronoi cells.
+    A class for optimizing mesh geometries by collapsing short edges in Voronoi cells
+    and polygon boundaries.
 
-    Parameters:
-    - voronoi_cells: List of Shapely Polygon or MultiPolygon objects representing the Voronoi cells.
-    - N: Optional, the number of shortest edges to print. If None, print all edges.
-    - threshold: Optional, the length threshold to print edges shorter than this value. If None, print edges based on N.
+    This class provides functionality to analyze and optimize geometric meshes by
+    identifying and collapsing short edges while preserving the overall structure
+    of the mesh.
 
-    Prints the lengths of the edges in the format:
-    Index: <index>, Length: <length>
-    
-    - Example usage:
-        - print_short_voronoiEdges(voronoi_cells, N=10)
-        - print_short_voronoiEdges(voronoi_cells, threshold=0.1)
+    Parameters
+    ----------
+    min_edge_length : float, optional
+        Minimum edge length threshold for optimization, by default None
+    verbose : bool, optional
+        Whether to print detailed information during processing, by default False
+
+    Attributes
+    ----------
+    _min_edge_length : float
+        Stored minimum edge length threshold
+    _verbose : bool
+        Flag for verbose output
     """
-    if (N is None and threshold is None) or (N is not None and threshold is not None):
-        raise ValueError("Specify exactly one of 'N' or 'threshold'.")
 
-    # Collect all edges with their lengths
-    edges = []
-    for cell in voronoi_cells:
-        if isinstance(cell, Polygon):
-            exterior_coords = list(cell.exterior.coords)
-            for i in range(len(exterior_coords) - 1):
-                line = LineString([exterior_coords[i], exterior_coords[i + 1]])
-                edges.append((line.length, line))
-        elif isinstance(cell, MultiPolygon):
-            for poly in cell.geoms:
-                exterior_coords = list(poly.exterior.coords)
-                for i in range(len(exterior_coords) - 1):
-                    line = LineString([exterior_coords[i], exterior_coords[i + 1]])
-                    edges.append((line.length, line))
+    def __init__(self, min_edge_length: Optional[float] = None, verbose: bool = False):
+        self._min_edge_length = min_edge_length
+        self._verbose = verbose
+        self._point_map: Dict = {}
 
-    # Sort edges by length
-    edges.sort(key=lambda x: x[0])
+    def _collect_polygon_edges(self, 
+                             polygon: Union[Polygon, MultiPolygon]
+                             ) -> List[Tuple[float, LineString, str, int]]:
+        """
+        Collect edges from a polygon with their associated metadata.
 
-    # Determine the edges to print based on N or threshold
-    if N is not None:
-        edges_to_print = edges[:N]
-    else:
-        edges_to_print = [edge for edge in edges if edge[0] < threshold]
+        Parameters
+        ----------
+        polygon : Union[Polygon, MultiPolygon]
+            Input polygon to collect edges from
 
-    if not edges_to_print:
-        # If there are no edges to print, print a message
-        print(f'There are no edges shorter than the threshold of {threshold}.')
-        return
-
-    # Print the edges
-    print('10 shortest edge lengths in the original Vononoi')
-    for idx, (length, _) in enumerate(edges_to_print):
-        print(f"Index: {idx}, Length: {length}")
-
-
-# This is the mesh optimization function to collapse the short edges of the generated Voronoi cells.
-def collapse_short_voronoiEdges(voronoi_cells, N=None, threshold=None):
-    """
-    Collapse the N shortest edges of the Voronoi cells by merging their vertices or collapse edges 
-    shorter than a specified threshold.
-    
-    Parameters:
-    - voronoi_cells: List of Shapely Polygon or MultiPolygon objects representing the Voronoi cells.
-    - N: Number of shortest edges to collapse.
-    - threshold: Length threshold to collapse edges shorter than this value.
-    
-    Returns:
-    - List of modified Shapely Polygon objects representing the Voronoi cells with collapsed edges.
-    
-    - Example usage:
-        - modified_voronoiCells = collapse_short_voronoiEdges(voronoi_cells, N=10)
-        - modified_voronoiCells = collapse_short_voronoiEdges(voronoi_cells, threshold=0.1)
-    """
-    if (N is None and threshold is None) or (N is not None and threshold is not None):
-        raise ValueError("Specify exactly one of 'N' or 'threshold'.")
-
-    # Collect all edges with their lengths and corresponding cell and index information
-    shortest_edges = []
-    for cell_index, cell in enumerate(voronoi_cells):
-        if isinstance(cell, Polygon):
-            exterior_coords = list(cell.exterior.coords)
-            for i in range(len(exterior_coords) - 1):
-                line = LineString([exterior_coords[i], exterior_coords[i + 1]])
-                shortest_edges.append((line.length, line, cell_index, i))
-        elif isinstance(cell, MultiPolygon):
-            for poly in cell.geoms:
-                exterior_coords = list(poly.exterior.coords)
-                for i in range(len(exterior_coords) - 1):
-                    line = LineString([exterior_coords[i], exterior_coords[i + 1]])
-                    shortest_edges.append((line.length, line, cell_index, i))
-
-    # Sort edges by length
-    shortest_edges.sort(key=lambda x: x[0])
-
-    # Select the edges to collapse based on N or threshold
-    if N is not None:
-        edges_to_collapse = shortest_edges[:N]
-    else:
-        edges_to_collapse = [edge for edge in shortest_edges if edge[0] < threshold]
-        
-        
-    if not edges_to_collapse:
-        # If there are no edges to collapse, return the original voronoi_cells
-        print('There are no edges to collapse, returned the original voronoi_cells')
-        return voronoi_cells
-
-    
-    # Step 1: Create a merge list for vertices
-    merge_list = {}
-    for _, line, _, _ in edges_to_collapse:
-        start, end = line.coords[0], line.coords[1]
-        merge_list[end] = start  # Merge end vertex into start vertex
-
-    # Step 2: Create a point map for merging vertices and check for cycles
-    point_map = {}
-    def find_root(vertex):
-        # Find the root of the vertex
-        root = vertex
-        while root in point_map:
-            root = point_map[root]
-        # Path compression
-        while vertex != root:
-            parent = point_map[vertex]
-            point_map[vertex] = root
-            vertex = parent
-        return root
-
-    for old_point, new_point in merge_list.items():
-        root_old = find_root(old_point)
-        root_new = find_root(new_point)
-        if root_old != root_new:
-#             point_map[root_new] = root_old  # This is original implementation
-            point_map[root_old] = root_new  # We can test which one works better
-
-    # Step 3: Update vertices in each Voronoi cell using the point map
-    def update_vertex(vertex):
-        return find_root(vertex)
-
-    modified_cells = []
-    for cell in voronoi_cells:
-        if isinstance(cell, Polygon):
-            new_coords = [update_vertex(coord) for coord in cell.exterior.coords[:-1]]
-            modified_cells.append(Polygon(new_coords))
-        elif isinstance(cell, MultiPolygon):
-            new_polys = []
-            for poly in cell.geoms:
-                new_coords = [update_vertex(coord) for coord in poly.exterior.coords[:-1]]
-                new_polys.append(Polygon(new_coords))
-            modified_cells.append(MultiPolygon(new_polys))
-
-    return modified_cells
-
-
-# ====================================================================================
-# ====================================================================================
-# Fuctions to optimize generated Polygon boundaries by collapsing targeted short edges
-
-# Function to print the short edges of the polygon boundaries
-def print_short_boundaryEdges(polygon, N=None, threshold=None):
-    """
-    Print the N shortest edges of the polygon or edges shorter than a specified threshold.
-    
-    Parameters:
-    - polygon: Shapely Polygon or MultiPolygon whose edges are to be printed.
-    - N: Number of shortest edges to print.
-    - threshold: Length threshold to print edges shorter than this value.
-    
-    - Example usage:
-        - print_short_boundaryEdges(polygon, N=10)
-        - print_short_boundaryEdges(polygon, threshold=0.1)
-    """
-    if (N is None and threshold is None) or (N is not None and threshold is not None):
-        raise ValueError("Specify exactly one of 'N' or 'threshold'.")
-
-    def collect_edges_from_polygon(polygon):
+        Returns
+        -------
+        List[Tuple[float, LineString, str, int]]
+            List of tuples containing (edge_length, line, boundary_type, index)
+        """
         edges = []
-        exterior_coords = list(polygon.exterior.coords)
-        for i in range(len(exterior_coords) - 1):
-            line = LineString([exterior_coords[i], exterior_coords[i + 1]])
-            edges.append((line.length, line))
-        for interior in polygon.interiors:
-            interior_coords = list(interior.coords)
-            for i in range(len(interior_coords) - 1):
-                line = LineString([interior_coords[i], interior_coords[i + 1]])
-                edges.append((line.length, line))
+        
+        def process_ring(coords, ring_type, ring_index=None):
+            for i in range(len(coords) - 1):
+                line = LineString([coords[i], coords[i + 1]])
+                edge_info = (line.length, line, 
+                           (ring_type, ring_index) if ring_index is not None else ring_type, 
+                           i)
+                edges.append(edge_info)
+
+        if isinstance(polygon, Polygon):
+            process_ring(list(polygon.exterior.coords), 'exterior')
+            for idx, interior in enumerate(polygon.interiors):
+                process_ring(list(interior.coords), 'interior', idx)
+        else:  # MultiPolygon
+            for poly_idx, poly in enumerate(polygon.geoms):
+                process_ring(list(poly.exterior.coords), 'exterior', poly_idx)
+                for int_idx, interior in enumerate(poly.interiors):
+                    process_ring(list(interior.coords), 'interior', (poly_idx, int_idx))
+
         return edges
 
-    # Collect all edges with their lengths
-    edges = collect_edges_from_polygon(polygon)
-    if isinstance(polygon, MultiPolygon):
-        for poly in polygon.geoms:
-            edges.extend(collect_edges_from_polygon(poly))
-    
-    # Sort edges by length
-    edges.sort(key=lambda x: x[0])
+    def _find_root(self, vertex: Tuple[float, float]) -> Tuple[float, float]:
+        """
+        Find the root vertex in the union-find data structure with path compression.
 
-    # Select the edges to print based on N or threshold
-    if N is not None:
-        edges_to_print = edges[:N]
-    else:
-        edges_to_print = [edge for edge in edges if edge[0] < threshold]
+        Parameters
+        ----------
+        vertex : Tuple[float, float]
+            Input vertex coordinates
 
-    if not edges_to_print:
-        print("No edges to print.")
-        return
-
-    # Print the edges
-    print('10 shortest edge lengths in the original Boundaries')
-    for index, (length, line) in enumerate(edges_to_print):
-        print(f"Index: {index}, Length: {length}")
-
-
-# Function to collapse short edges of the polygon boundaries
-def collapse_short_boundaryEdges(polygon, N=None, threshold=None):
-    """
-    Collapse the N shortest edges of the polygon by merging their vertices or collapse edges 
-    shorter than a specified threshold.
-    
-    Parameters:
-    - polygon: Shapely Polygon or MultiPolygon defining the boundary.
-    - N: Number of shortest edges to collapse.
-    - threshold: Length threshold to collapse edges shorter than this value.
-    
-    Returns:
-    - Modified Shapely Polygon or MultiPolygon with collapsed edges.
-    
-    - Example usage:
-        - modified_polygon = collapse_short_boundaryEdges(polygon, N=10)
-        - modified_polygon = collapse_short_boundaryEdges(polygon, threshold=0.1)
-    """
-    if (N is None and threshold is None) or (N is not None and threshold is not None):
-        raise ValueError("Specify exactly one of 'N' or 'threshold'.")
-
-    def collect_edges_from_polygon(polygon):
-        edges = []
-        exterior_coords = list(polygon.exterior.coords)
-        for i in range(len(exterior_coords) - 1):
-            line = LineString([exterior_coords[i], exterior_coords[i + 1]])
-            edges.append((line.length, line, 'exterior', i))
-        for interior_index, interior in enumerate(polygon.interiors):
-            interior_coords = list(interior.coords)
-            for i in range(len(interior_coords) - 1):
-                line = LineString([interior_coords[i], interior_coords[i + 1]])
-                edges.append((line.length, line, ('interior', interior_index), i))
-        return edges
-
-    # Collect all edges with their lengths and corresponding cell and index information
-    shortest_edges = collect_edges_from_polygon(polygon)
-    if isinstance(polygon, MultiPolygon):
-        for poly_index, poly in enumerate(polygon.geoms):
-            shortest_edges.extend(collect_edges_from_polygon(poly))
-    
-    # Sort edges by length
-    shortest_edges.sort(key=lambda x: x[0])
-
-    # Select the edges to collapse based on N or threshold
-    if N is not None:
-        edges_to_collapse = shortest_edges[:N]
-    else:
-        edges_to_collapse = [edge for edge in shortest_edges if edge[0] < threshold]
-    
-    if not edges_to_collapse:
-        # If there are no edges to collapse, return the original polygon
-        print('There are no edges to collapse, returned the original polygon')
-        return polygon
-
-    # Step 1: Create a merge list for vertices
-    merge_list = {}
-    for _, line, _, _ in edges_to_collapse:
-        start, end = line.coords[0], line.coords[1]
-        merge_list[end] = start  # Merge end vertex into start vertex
-
-    # Step 2: Create a point map for merging vertices and check for cycles
-    point_map = {}
-    def find_root(vertex):
-        # Find the root of the vertex
+        Returns
+        -------
+        Tuple[float, float]
+            Root vertex coordinates
+        """
         root = vertex
-        while root in point_map:
-            root = point_map[root]
+        while root in self._point_map:
+            root = self._point_map[root]
+        
         # Path compression
         while vertex != root:
-            parent = point_map[vertex]
-            point_map[vertex] = root
+            parent = self._point_map[vertex]
+            self._point_map[vertex] = root
             vertex = parent
+            
         return root
 
-    for old_point, new_point in merge_list.items():
-        root_old = find_root(old_point)
-        root_new = find_root(new_point)
-        if root_old != root_new:
-            point_map[root_old] = root_new
+    def _create_vertex_mapping(self, 
+                             edges_to_collapse: List[Tuple[float, LineString, str, int]]
+                             ) -> None:
+        """
+        Create vertex mapping for edge collapse operations.
 
-    # Step 3: Update vertices in the polygon using the point map
-    def update_vertex(vertex):
-        return find_root(vertex)
-    
-    def update_polygon(polygon):
-        new_exterior_coords = [update_vertex(coord) for coord in polygon.exterior.coords[:-1]]
-        new_interiors = []
-        for interior in polygon.interiors:
-            new_interior_coords = [update_vertex(coord) for coord in interior.coords[:-1]]
-            new_interiors.append(new_interior_coords)
-        return Polygon(new_exterior_coords, new_interiors)
+        Parameters
+        ----------
+        edges_to_collapse : List[Tuple[float, LineString, str, int]]
+            List of edges to be collapsed
+        """
+        self._point_map.clear()
+        merge_list = {}
+        
+        # Create initial merge list
+        for _, line, _, _ in edges_to_collapse:
+            start, end = line.coords[0], line.coords[1]
+            merge_list[end] = start
 
-    if isinstance(polygon, Polygon):
-        modified_polygon = update_polygon(polygon)
-    elif isinstance(polygon, MultiPolygon):
-        modified_polys = [update_polygon(poly) for poly in polygon.geoms]
-        modified_polygon = unary_union(modified_polys)
+        # Create unified vertex mapping
+        for old_point, new_point in merge_list.items():
+            root_old = self._find_root(old_point)
+            root_new = self._find_root(new_point)
+            if root_old != root_new:
+                self._point_map[root_old] = root_new
 
-    return modified_polygon
+    def analyze_voronoi_edges(self, 
+                            voronoi_cells: List[Union[Polygon, MultiPolygon]], 
+                            n: Optional[int] = None, 
+                            threshold: Optional[float] = None) -> None:
+        """
+        Analyze and print information about short edges in Voronoi cells.
+
+        Parameters
+        ----------
+        voronoi_cells : List[Union[Polygon, MultiPolygon]]
+            List of Voronoi cells to analyze
+        n : int, optional
+            Number of shortest edges to analyze, by default None
+        threshold : float, optional
+            Length threshold for edge analysis, by default None
+
+        Raises
+        ------
+        ValueError
+            If neither or both n and threshold are specified
+        """
+        if (n is None and threshold is None) or (n is not None and threshold is not None):
+            raise ValueError("Specify exactly one of 'n' or 'threshold'")
+
+        edges = []
+        for cell in voronoi_cells:
+            edges.extend(self._collect_polygon_edges(cell))
+        
+        edges.sort(key=lambda x: x[0])
+        edges_to_print = edges[:n] if n is not None else [e for e in edges if e[0] < threshold]
+
+        if not edges_to_print:
+            print(f'No edges found {"shorter than " + str(threshold) if threshold else ""}')
+            return
+
+        print(f'{"First " + str(n) if n else "All"} edge lengths in Voronoi cells:')
+        for idx, (length, _, _, _) in enumerate(edges_to_print):
+            print(f"Edge {idx}: {length:.6f}")
+
+    def optimize_voronoi_cells(self, 
+                             voronoi_cells: List[Union[Polygon, MultiPolygon]], 
+                             n: Optional[int] = None, 
+                             threshold: Optional[float] = None
+                             ) -> List[Union[Polygon, MultiPolygon]]:
+        """
+        Optimize Voronoi cells by collapsing short edges.
+
+        Parameters
+        ----------
+        voronoi_cells : List[Union[Polygon, MultiPolygon]]
+            List of Voronoi cells to optimize
+        n : int, optional
+            Number of shortest edges to collapse, by default None
+        threshold : float, optional
+            Length threshold for edge collapse, by default None
+
+        Returns
+        -------
+        List[Union[Polygon, MultiPolygon]]
+            Optimized Voronoi cells
+
+        Raises
+        ------
+        ValueError
+            If neither or both n and threshold are specified
+        """
+        if (n is None and threshold is None) or (n is not None and threshold is not None):
+            raise ValueError("Specify exactly one of 'n' or 'threshold'")
+
+        # Collect and sort edges
+        edges = []
+        for cell in voronoi_cells:
+            edges.extend(self._collect_polygon_edges(cell))
+        edges.sort(key=lambda x: x[0])
+
+        # Select edges to collapse
+        edges_to_collapse = edges[:n] if n is not None else [e for e in edges if e[0] < threshold]
+
+        if not edges_to_collapse:
+            if self._verbose:
+                print('No edges to collapse, returning original cells')
+            return voronoi_cells
+
+        # Create vertex mapping and optimize cells
+        self._create_vertex_mapping(edges_to_collapse)
+        
+        modified_cells = []
+        for cell in voronoi_cells:
+            if isinstance(cell, Polygon):
+                new_coords = [self._find_root(coord) for coord in cell.exterior.coords[:-1]]
+                modified_cells.append(Polygon(new_coords))
+            else:  # MultiPolygon
+                new_polys = []
+                for poly in cell.geoms:
+                    new_coords = [self._find_root(coord) for coord in poly.exterior.coords[:-1]]
+                    new_polys.append(Polygon(new_coords))
+                modified_cells.append(MultiPolygon(new_polys))
+
+        return modified_cells
+
+    def analyze_boundary_edges(self, 
+                             polygon: Union[Polygon, MultiPolygon], 
+                             n: Optional[int] = None, 
+                             threshold: Optional[float] = None) -> None:
+        """
+        Analyze and print information about short edges in polygon boundaries.
+
+        Parameters
+        ----------
+        polygon : Union[Polygon, MultiPolygon]
+            Polygon to analyze
+        n : int, optional
+            Number of shortest edges to analyze, by default None
+        threshold : float, optional
+            Length threshold for edge analysis, by default None
+
+        Raises
+        ------
+        ValueError
+            If neither or both n and threshold are specified
+        """
+        if (n is None and threshold is None) or (n is not None and threshold is not None):
+            raise ValueError("Specify exactly one of 'n' or 'threshold'")
+
+        edges = self._collect_polygon_edges(polygon)
+        edges.sort(key=lambda x: x[0])
+        
+        edges_to_print = edges[:n] if n is not None else [e for e in edges if e[0] < threshold]
+
+        if not edges_to_print:
+            print(f'No edges found {"shorter than " + str(threshold) if threshold else ""}')
+            return
+
+        print(f'{"First " + str(n) if n else "All"} edge lengths in boundary:')
+        for idx, (length, _, _, _) in enumerate(edges_to_print):
+            print(f"Edge {idx}: {length:.6f}")
+
+    def optimize_boundary(self, 
+                        polygon: Union[Polygon, MultiPolygon], 
+                        n: Optional[int] = None, 
+                        threshold: Optional[float] = None
+                        ) -> Union[Polygon, MultiPolygon]:
+        """
+        Optimize polygon boundaries by collapsing short edges.
+
+        Parameters
+        ----------
+        polygon : Union[Polygon, MultiPolygon]
+            Polygon to optimize
+        n : int, optional
+            Number of shortest edges to collapse, by default None
+        threshold : float, optional
+            Length threshold for edge collapse, by default None
+
+        Returns
+        -------
+        Union[Polygon, MultiPolygon]
+            Optimized polygon
+
+        Raises
+        ------
+        ValueError
+            If neither or both n and threshold are specified
+        """
+        if (n is None and threshold is None) or (n is not None and threshold is not None):
+            raise ValueError("Specify exactly one of 'n' or 'threshold'")
+
+        # Collect and sort edges
+        edges = self._collect_polygon_edges(polygon)
+        edges.sort(key=lambda x: x[0])
+
+        # Select edges to collapse
+        edges_to_collapse = edges[:n] if n is not None else [e for e in edges if e[0] < threshold]
+
+        if not edges_to_collapse:
+            if self._verbose:
+                print('No edges to collapse, returning original polygon')
+            return polygon
+
+        # Create vertex mapping
+        self._create_vertex_mapping(edges_to_collapse)
+
+        # Update polygon vertices
+        def update_polygon(poly: Polygon) -> Polygon:
+            new_exterior = [self._find_root(coord) for coord in poly.exterior.coords[:-1]]
+            new_interiors = []
+            for interior in poly.interiors:
+                new_interior = [self._find_root(coord) for coord in interior.coords[:-1]]
+                new_interiors.append(new_interior)
+            return Polygon(new_exterior, new_interiors)
+
+        if isinstance(polygon, Polygon):
+            return update_polygon(polygon)
+        else:  # MultiPolygon
+            modified_polys = [update_polygon(poly) for poly in polygon.geoms]
+            return unary_union(modified_polys)
