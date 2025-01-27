@@ -34,6 +34,10 @@ jobs:
         run: |
           poetry install --with dev
 
+      - name: Install ghp-import
+        run: |
+          poetry run pip install ghp-import  # Ensure ghp-import is installed
+
       - name: Build documentation
         run: |
           cd docs
