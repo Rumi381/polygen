@@ -29,7 +29,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install --with dev
+          poetry install --only dev
 
       - name: Build documentation
         run: |
@@ -39,7 +39,7 @@ jobs:
 
       - name: Deploy to GitHub Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Only deploy on push to main
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/_build/html
