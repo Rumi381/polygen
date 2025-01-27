@@ -1,12 +1,15 @@
 name: Documentation
 
+# Controls when the workflow will run
 on:
+  # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches:
-      - main  # or master, depending on your default branch
+    branches: [ main ]
   pull_request:
-    branches:
-      - main  # or master
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build-docs:
@@ -29,7 +32,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install --only dev
+          poetry install --with dev
 
       - name: Build documentation
         run: |
@@ -37,10 +40,12 @@ jobs:
           poetry run make html
           touch _build/html/.nojekyll  # Add this line to prevent 404 errors on GitHub Pages
 
-      - name: Deploy to GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Only deploy on push to main
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/_build/html
-          force_orphan: true
+      - name: Run ghp-import
+        run: | 
+          ghp-import -n -p -f docs/_build/html
+
+      # Runs a set of commands using the runners shell
+      - name: Run a multi-line script
+        run: |
+          echo Add other actions to build,
+          echo test, and deploy your project.
