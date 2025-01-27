@@ -1,0 +1,360 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>polygen.polygen2d.finiteThicknessCohesiveZone &mdash; polygen 1.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="canonical" href="https://Rumi381.github.io/polygen/_modules/polygen/polygen2d/finiteThicknessCohesiveZone.html" />
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=6efca38a"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/custom.js?v=14139ab5"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            polygen
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">polygen</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">polygen</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">polygen.polygen2d.finiteThicknessCohesiveZone</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for polygen.polygen2d.finiteThicknessCohesiveZone</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shapely.geometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Polygon</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shapely.affinity</span><span class="w"> </span><span class="kn">import</span> <span class="n">scale</span>
+
+<div class="viewcode-block" id="CohesiveZoneAdjuster">
+<a class="viewcode-back" href="../../../polygen.polygen2d.html#polygen.polygen2d.finiteThicknessCohesiveZone.CohesiveZoneAdjuster">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CohesiveZoneAdjuster</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A class for adjusting Voronoi cells to introduce finite-thickness cohesive zones.</span>
+<span class="sd">    </span>
+<span class="sd">    This class provides methods for modifying Voronoi cells by either applying a fixed</span>
+<span class="sd">    thickness gap or iteratively adjusting to achieve a target area ratio.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    tolerance : float, optional</span>
+<span class="sd">        Convergence tolerance for area ratio (default: 0.005)</span>
+<span class="sd">    max_iterations : int, optional</span>
+<span class="sd">        Maximum number of adjustment iterations (default: 10)</span>
+<span class="sd">    verbose : bool, optional</span>
+<span class="sd">        Whether to print progress information (default: False)</span>
+<span class="sd">        </span>
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    history : List[Tuple[float, float]]</span>
+<span class="sd">        History of (thickness, ratio) pairs from iterations</span>
+<span class="sd">    </span>
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The adjustment process follows two possible approaches:</span>
+<span class="sd">    </span>
+<span class="sd">    1. Fixed thickness (t):</span>
+<span class="sd">       Each cell V(i) is scaled as V&#39;(i) = S(1-t)(V(i))</span>
+<span class="sd">       </span>
+<span class="sd">    2. Target area ratio (r):</span>
+<span class="sd">       Iteratively adjusts thickness until one of these conditions is met:</span>
+<span class="sd">       </span>
+<span class="sd">       * The area ratio difference is within tolerance</span>
+<span class="sd">       * Maximum iterations are reached</span>
+<span class="sd">       </span>
+<span class="sd">       where the area ratio difference is the absolute difference between </span>
+<span class="sd">       the current ratio r(k) and the target ratio r_target.</span>
+<span class="sd">       </span>
+<span class="sd">    Mathematical Details:</span>
+<span class="sd">       * S(α) is the scaling operator</span>
+<span class="sd">       * r(k) is the area ratio at iteration k</span>
+<span class="sd">       * The convergence criterion is: abs(current_ratio - target_ratio) ≤ tolerance</span>
+<span class="sd">       * The iteration limit is: current_iteration &gt; max_iterations</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<div class="viewcode-block" id="CohesiveZoneAdjuster.__init__">
+<a class="viewcode-back" href="../../../polygen.polygen2d.html#polygen.polygen2d.finiteThicknessCohesiveZone.CohesiveZoneAdjuster.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.005</span><span class="p">,</span>
+        <span class="n">max_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tolerance</span> <span class="o">=</span> <span class="n">tolerance</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_iterations</span> <span class="o">=</span> <span class="n">max_iterations</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span></div>
+
+        
+    <span class="k">def</span><span class="w"> </span><span class="nf">_interpolate_thickness</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">target_ratio</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Interpolate thickness using Lagrange polynomials.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        target_ratio : float</span>
+<span class="sd">            Target area ratio to achieve</span>
+<span class="sd">            </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            Interpolated thickness value</span>
+<span class="sd">            </span>
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Uses linear or quadratic interpolation based on available history:</span>
+<span class="sd">        - n=1: Linear scaling</span>
+<span class="sd">        - n=2: Linear interpolation</span>
+<span class="sd">        - n≥3: Quadratic interpolation using last 3 points</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="c1"># Linear scaling for single point</span>
+            <span class="n">thickness</span><span class="p">,</span> <span class="n">ratio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">thickness</span> <span class="o">*</span> <span class="n">target_ratio</span> <span class="o">/</span> <span class="n">ratio</span>
+            
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="c1"># Linear interpolation</span>
+            <span class="p">(</span><span class="n">t1</span><span class="p">,</span> <span class="n">r1</span><span class="p">),</span> <span class="p">(</span><span class="n">t2</span><span class="p">,</span> <span class="n">r2</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span>
+            <span class="k">return</span> <span class="n">t1</span> <span class="o">+</span> <span class="p">(</span><span class="n">target_ratio</span> <span class="o">-</span> <span class="n">r1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">t2</span> <span class="o">-</span> <span class="n">t1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">r2</span> <span class="o">-</span> <span class="n">r1</span><span class="p">)</span>
+            
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Quadratic interpolation using last 3 points</span>
+            <span class="n">points</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">:]</span>
+            <span class="n">thicknesses</span><span class="p">,</span> <span class="n">ratios</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">points</span><span class="p">)</span>
+            
+            <span class="c1"># Lagrange basis polynomials</span>
+            <span class="n">L</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">product</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">i</span> <span class="o">!=</span> <span class="n">j</span><span class="p">:</span>
+                        <span class="n">product</span> <span class="o">*=</span> <span class="p">((</span><span class="n">target_ratio</span> <span class="o">-</span> <span class="n">ratios</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="o">/</span> 
+                                  <span class="p">(</span><span class="n">ratios</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ratios</span><span class="p">[</span><span class="n">j</span><span class="p">]))</span>
+                <span class="n">L</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">product</span><span class="p">)</span>
+                
+            <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">L</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">thicknesses</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+        
+    <span class="k">def</span><span class="w"> </span><span class="nf">_adjust_cells</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">cells</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">],</span>
+        <span class="n">thickness</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">],</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adjust cells using given thickness factor.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cells : List[Polygon]</span>
+<span class="sd">            Input Voronoi cells</span>
+<span class="sd">        thickness : float</span>
+<span class="sd">            Scaling factor to apply</span>
+<span class="sd">            </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Tuple[List[Polygon], float]</span>
+<span class="sd">            Adjusted cells and achieved area ratio</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">initial_area</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">area</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">cells</span><span class="p">)</span>
+        <span class="n">adjusted_cells</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">current_area</span> <span class="o">=</span> <span class="mf">0.0</span>
+        
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">cells</span><span class="p">:</span>
+            <span class="n">adjusted</span> <span class="o">=</span> <span class="n">scale</span><span class="p">(</span>
+                <span class="n">cell</span><span class="p">,</span>
+                <span class="n">xfact</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">thickness</span><span class="p">),</span>
+                <span class="n">yfact</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">thickness</span><span class="p">),</span>
+                <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;centroid&#39;</span>
+            <span class="p">)</span>
+            
+            <span class="k">if</span> <span class="n">adjusted</span><span class="o">.</span><span class="n">is_valid</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">adjusted</span><span class="o">.</span><span class="n">is_empty</span><span class="p">:</span>
+                <span class="n">adjusted_cells</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">adjusted</span><span class="p">)</span>
+                <span class="n">current_area</span> <span class="o">+=</span> <span class="n">adjusted</span><span class="o">.</span><span class="n">area</span>
+                
+        <span class="n">achieved_ratio</span> <span class="o">=</span> <span class="n">current_area</span> <span class="o">/</span> <span class="n">initial_area</span>
+        <span class="k">return</span> <span class="n">adjusted_cells</span><span class="p">,</span> <span class="n">achieved_ratio</span>
+        
+<div class="viewcode-block" id="CohesiveZoneAdjuster.adjust_fixed_thickness">
+<a class="viewcode-back" href="../../../polygen.polygen2d.html#polygen.polygen2d.finiteThicknessCohesiveZone.CohesiveZoneAdjuster.adjust_fixed_thickness">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">adjust_fixed_thickness</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">cells</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">],</span>
+        <span class="n">thickness</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adjust cells using a fixed thickness value.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cells : List[Polygon]</span>
+<span class="sd">            Input Voronoi cells</span>
+<span class="sd">        thickness : float</span>
+<span class="sd">            Fixed gap thickness to apply</span>
+<span class="sd">            </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        List[Polygon]</span>
+<span class="sd">            Adjusted Voronoi cells</span>
+<span class="sd">            </span>
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; adjuster = CohesiveZoneAdjuster()</span>
+<span class="sd">        &gt;&gt;&gt; adjusted = adjuster.adjust_fixed_thickness(cells, thickness=0.1)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">adjusted_cells</span><span class="p">,</span> <span class="n">achieved_ratio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adjust_cells</span><span class="p">(</span><span class="n">cells</span><span class="p">,</span> <span class="n">thickness</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Applied thickness: </span><span class="si">{</span><span class="n">thickness</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Achieved area ratio: </span><span class="si">{</span><span class="n">achieved_ratio</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+        <span class="k">return</span> <span class="n">adjusted_cells</span></div>
+
+        
+<div class="viewcode-block" id="CohesiveZoneAdjuster.adjust_target_ratio">
+<a class="viewcode-back" href="../../../polygen.polygen2d.html#polygen.polygen2d.finiteThicknessCohesiveZone.CohesiveZoneAdjuster.adjust_target_ratio">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">adjust_target_ratio</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">cells</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">],</span>
+        <span class="n">target_ratio</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">initial_thickness</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Polygon</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Iteratively adjust cells to achieve target area ratio.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cells : List[Polygon]</span>
+<span class="sd">            Input Voronoi cells</span>
+<span class="sd">        target_ratio : float</span>
+<span class="sd">            Target area ratio to achieve</span>
+<span class="sd">        initial_thickness : float, optional</span>
+<span class="sd">            Starting thickness value, default=0.1</span>
+<span class="sd">            </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        List[Polygon]</span>
+<span class="sd">            Adjusted Voronoi cells</span>
+<span class="sd">            </span>
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; adjuster = CohesiveZoneAdjuster(tolerance=0.001)</span>
+<span class="sd">        &gt;&gt;&gt; adjusted = adjuster.adjust_target_ratio(cells, target_ratio=0.75)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="n">current_thickness</span> <span class="o">=</span> <span class="n">initial_thickness</span>
+        
+        <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_iterations</span><span class="p">):</span>
+            <span class="c1"># Adjust cells with current thickness</span>
+            <span class="n">adjusted_cells</span><span class="p">,</span> <span class="n">achieved_ratio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adjust_cells</span><span class="p">(</span>
+                <span class="n">cells</span><span class="p">,</span>
+                <span class="n">current_thickness</span>
+            <span class="p">)</span>
+            
+            <span class="c1"># Update history</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_thickness</span><span class="p">,</span> <span class="n">achieved_ratio</span><span class="p">))</span>
+            
+            <span class="c1"># Check convergence</span>
+            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">achieved_ratio</span> <span class="o">-</span> <span class="n">target_ratio</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tolerance</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Converged after </span><span class="si">{</span><span class="n">iteration</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> iterations&quot;</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final thickness: </span><span class="si">{</span><span class="n">current_thickness</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Achieved ratio: </span><span class="si">{</span><span class="n">achieved_ratio</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">adjusted_cells</span>
+                
+            <span class="c1"># Update thickness through interpolation</span>
+            <span class="n">current_thickness</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_thickness</span><span class="p">(</span><span class="n">target_ratio</span><span class="p">)</span>
+            
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Iteration </span><span class="si">{</span><span class="n">iteration</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Thickness: </span><span class="si">{</span><span class="n">current_thickness</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Area ratio: </span><span class="si">{</span><span class="n">achieved_ratio</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                
+        <span class="c1"># Maximum iterations reached</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Maximum iterations reached&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best ratio: </span><span class="si">{</span><span class="n">achieved_ratio</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final thickness: </span><span class="si">{</span><span class="n">current_thickness</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+        <span class="k">return</span> <span class="n">adjusted_cells</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Md Jalal Uddin Rumi.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
