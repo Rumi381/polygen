@@ -1,6 +1,6 @@
-# VoroMesh: An Efficient Framework for Polycrystal Generation and Cohesive Zone Modeling in Arbitrary Domains
+# polygen: An Efficient Framework for Polycrystal Generation and Cohesive Zone Modeling in Arbitrary Domains
 
-This project aims to generalize polycrystal generation and polygonal meshing in any arbitrary 2D domains through `Constrained Voronoi Tessellation` for Finite Element Method (FEM) and Cohesive Zone Modeling (CZM). `VoroMesh` also provides the functionality to adjust polygonal mesh to insert finite-thickness cohesive zone and offers efficient datastructures to integrate with Abaqus CAE. Additionally, this package also offers an excellent tool for triangular meshing of complex 2D domains.
+This project aims to generalize polycrystal generation and polygonal meshing in any arbitrary 2D domains through `Constrained Voronoi Tessellation` for Finite Element Method (FEM) and Cohesive Zone Modeling (CZM). `polygen` also provides the functionality to adjust polygonal mesh to insert finite-thickness cohesive zone and offers efficient datastructures to integrate with Abaqus CAE. Additionally, this package also offers an excellent tool for triangular meshing of complex 2D domains.
 
 ## Features
 
@@ -16,22 +16,23 @@ This project aims to generalize polycrystal generation and polygonal meshing in 
 To install the package, use `pip`:
 
 ```bash
-pip install voronoi_meshing
+cd polygen
+pip install -e .
 ```
 
 ## Accessing Documentation
 
-To access the documentation for any function, class, or method in the project, please visit the official documentation page of VoroMesh [View the Docs](https://Rumi381.github.io/voromesh/)
+To access the documentation for any function, class, or method in the project, please visit the official documentation page of polygen [View the Docs](https://Rumi381.github.io/polygen/)
 
 ## Example Usage
 
-Check out the detailed examples and usages of different functionalities in the [VoroMesh Jupyter Notebook](examples/voromesh.ipynb).
+Check out the detailed examples and usages of different functionalities in the [polygen Jupyter Notebook](examples/polygen.ipynb).
 
-## Running `VoroMesh` from the command line
+## Running `polygen` from the command line
 If you have set up the input file with the desired functionalites, you can run the following command in the terminal (assuming your input file is in the `examples` directory inside your working directory):
 
 ```sh
-voromesh -d2 ./examples/input.in
+polygen -d2 ./examples/input.in
 ```
 
 ### Example Input File (`input.in`)
@@ -41,7 +42,7 @@ The `input.in` file should contain the necessary inputs for running the desired 
 #### Parameters
 
 - **boundary** : str or dict
-    The path to the `mesio` supported mesh file defining the boundary or predefined geometry object provided by `VoroMesh`
+    The path to the `mesio` supported mesh file defining the boundary or predefined geometry object provided by `polygen`
 - **N_points** : int
     Number of initial seed points for the Voronoi diagram
 - **points_seed** : int, optional
